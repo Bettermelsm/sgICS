@@ -10,6 +10,10 @@ LLM 接智谱 GLM，抖店（飞鸽）适配器以 Playwright 网页自动化为
 前置：安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 （Win11 需开启 WSL2 与 BIOS 虚拟化）。
 
+> 国内构建加速：Docker Desktop → Settings → Docker Engine，
+> 在 `registry-mirrors` 中添加 `["https://docker.m.daocloud.io"]`，
+> 否则拉取基础镜像可能很慢。Dockerfile 中的 pip 已默认走国内镜像。
+
 ```bat
 :: 解压后进入目录，复制环境文件
 copy .env.example .env
