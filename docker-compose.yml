@@ -1,0 +1,21 @@
+# v0.1 一行启动：docker compose up --build
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # 数据库落到挂载卷，容器重建不丢数据
+      - DB_PATH=/data/db.sqlite3
+      # demo 管理员账号（首次启动自动创建）
+      - DJANGO_SUPERUSER_USERNAME=admin
+      - DJANGO_SUPERUSER_PASSWORD=admin123
+      - DJANGO_SUPERUSER_EMAIL=admin@example.com
+    volumes:
+      - csdata:/data
+    restart: unless-stopped
+
+volumes:
+  csdata:
