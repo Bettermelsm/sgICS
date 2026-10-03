@@ -3,7 +3,29 @@
 Django 自研路线第一步：**大脑先跑通**。本 demo 实现原 ChatGPT-On-CS 的
 回复流水线（转人工 → 关键词 → AI兜底 → 默认回复 → 出站替换），
 LLM 接智谱 GLM，抖店（飞鸽）适配器以 Playwright 网页自动化为方案（骨架已就绪，
-真实店铺联调为第二步）。
+真实店铺联调为下一版本）。
+
+## 零、Docker 一行启动（v0.1 推荐）
+
+前置：安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+（Win11 需开启 WSL2 与 BIOS 虚拟化）。
+
+```bat
+:: 解压后进入目录，复制环境文件
+copy .env.example .env
+:: 需要真实 GLM 时，把 ZHIPU_API_KEY 填进 .env（先不填也行，离线演示）
+
+:: 一行启动
+docker compose up --build
+```
+
+- 工作台：http://localhost:8000/admin/（账号 `admin` / 密码 `admin123`）
+- 离线演示：`docker compose exec web python manage.py demo_pipeline`
+- 真实 GLM：填好 Key 后 `docker compose exec web python manage.py demo_pipeline --real`
+- 跑单测：`docker compose exec web python manage.py test`
+- 数据持久化在 Docker 卷 `csdata` 中，重建容器不丢
+
+下面是**不装 Docker、直接用 Python** 的方式（二选一即可）。
 
 ## 一、Win11 环境准备（零基础按顺序做）
 
