@@ -2,6 +2,21 @@
 
 格式：`## [版本号] - 日期`，下挂 Added / Changed / Fixed。
 
+## [v0.3.0] - 2026-10-05
+### Added
+- 抖店 Playwright 适配器完整实现：扫码登录（保存登录态）/ 轮询新消息 / 发送 / 转人工
+- `login_douyin` 命令：无头截图二维码，手机扫码后保存登录态（之后免扫码）
+- `poll_douyin` 消息泵：轮询→去重（内存+DB external_id 双重）→走流水线→存草稿
+- `adapters/debug.py` 诊断包：失败自动收集截图/DOM/日志，供远程排错
+- `docs/DOUYIN.md` 真实联调手册（含子账号最小权限建议）
+- 迁移 0002：ChatMessage.external_id（平台消息 ID，消息去重用）
+### Changed
+- Dockerfile 安装 Playwright chromium（含系统依赖）
+- docker-compose 挂载登录态与诊断目录到 /data 卷（重建不丢）
+### 安全
+- v0.3 全程草稿模式：`poll_douyin` 内 `ALLOW_SEND = False` 写死，
+  `send_message` / `transfer_to_human` 已实现但无任何命令调用
+
 ## [v0.2.0] - 2026-10-05
 ### Added
 - `check_glm` 命令：一键验证智谱 Key 有效性、模型名与往返延迟
