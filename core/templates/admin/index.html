@@ -1,0 +1,36 @@
+{% extends "admin/index.html" %}
+
+{# 工作台引导卡片：编号步骤 + 一句话做法 + 实时状态 #}
+{% block content %}
+{% if guide_cards %}
+<style>
+.guide-intro { background: #f7f9fb; border: 1px solid #e0e0e0; border-radius: 6px;
+  padding: 10px 14px; margin-bottom: 12px; font-size: 13px; color: #444; }
+.guide-wrap { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+.guide-card { flex: 1 1 200px; background: #fff; border: 1px solid #e0e0e0;
+  border-left: 4px solid #417690; border-radius: 6px; padding: 12px 14px; }
+.guide-card.done { border-left-color: #4caf50; }
+.guide-num { font-size: 12px; color: #888; letter-spacing: 1px; }
+.guide-card.done .guide-num { color: #2e7d32; }
+.guide-title { font-size: 15px; font-weight: 600; margin: 4px 0 6px; }
+.guide-desc { font-size: 12.5px; color: #555; line-height: 1.65; }
+.guide-status { font-size: 12px; margin-top: 8px; color: #417690; }
+.guide-card.done .guide-status { color: #2e7d32; }
+.guide-action { display: inline-block; margin-top: 8px; font-size: 12.5px; }
+</style>
+<div class="guide-intro">📋 <b>工作台使用指南</b> — 按编号顺序走一遍，系统即进入草稿待命状态。每一步的完成状态实时显示在卡片上。</div>
+<div class="guide-wrap">
+{% for c in guide_cards %}
+  <div class="guide-card{% if c.done %} done{% endif %}">
+    <div class="guide-num">{{ c.num }}{% if c.done %} ✓{% endif %}</div>
+    <div class="guide-title">{{ c.title }}</div>
+    <div class="guide-desc">{{ c.desc }}</div>
+    <div class="guide-status">{{ c.status }}</div>
+    {% if c.url %}<a class="guide-action" href="{{ c.url }}">{{ c.action }} →</a>
+    {% else %}<span class="guide-action" style="color:#888">{{ c.action }}</span>{% endif %}
+  </div>
+{% endfor %}
+</div>
+{% endif %}
+{{ block.super }}
+{% endblock %}
