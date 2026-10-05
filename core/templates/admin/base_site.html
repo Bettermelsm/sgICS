@@ -1,0 +1,7 @@
+{% extends "admin/base_site.html" %}
+
+{# 右上角版本号：确认当前运行版本用 #}
+{% block usertools %}
+{{ block.super }}
+<div style="float: right; color: #fff; font-size: 12px; padding: 10px 15px; opacity: 0.85;">v{{ cs_version }}</div>
+{% endblock %}

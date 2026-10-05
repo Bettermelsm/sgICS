@@ -2,6 +2,13 @@
 
 格式：`## [版本号] - 日期`，下挂 Added / Changed / Fixed。
 
+## [v0.3.1] - 2026-10-05
+### Added
+- Admin 右上角显示版本号（登录页表单下方同样显示），确认当前运行版本
+- `core/version.py` 作为版本号唯一来源，随发布 tag 同步更新
+### Fixed
+- `core` 在 INSTALLED_APPS 中移至 admin 之前，使 admin 模板覆盖生效
+
 ## [v0.3.0] - 2026-10-05
 ### Added
 - 抖店 Playwright 适配器完整实现：扫码登录（保存登录态）/ 轮询新消息 / 发送 / 转人工
