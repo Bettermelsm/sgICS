@@ -25,7 +25,11 @@ docker compose up --build
 
 - 工作台：http://localhost:8000/admin/（账号 `admin` / 密码 `admin123`）
 - 离线演示：`docker compose exec web python manage.py demo_pipeline`
-- 真实 GLM：填好 Key 后 `docker compose exec web python manage.py demo_pipeline --real`
+- 多轮对话演示：`docker compose exec web python manage.py demo_pipeline --multi`
+- GLM 连通性检查（需先在 .env 填 ZHIPU_API_KEY）：
+  `docker compose exec web python manage.py check_glm`
+- 真实 GLM 演示：`docker compose exec web python manage.py demo_pipeline --real`
+- 真实 GLM 多轮演示：`docker compose exec web python manage.py demo_pipeline --real --multi`
 - 跑单测：`docker compose exec web python manage.py test`
 - 数据持久化在 Docker 卷 `csdata` 中，重建容器不丢
 

@@ -2,6 +2,15 @@
 
 格式：`## [版本号] - 日期`，下挂 Added / Changed / Fixed。
 
+## [v0.2.0] - 2026-10-05
+### Added
+- `check_glm` 命令：一键验证智谱 Key 有效性、模型名与往返延迟
+- `demo_pipeline --multi`：多轮连续对话演示，验证上下文传递（建议配合 --real）
+- GLM 网关加固：中文错误信息（Key 无效/限流/超时/空回复）、超时自动重试 1 次
+- Admin 回复日志列表：显示客户名、店铺、消息预览
+### Changed
+- 网关异常统一为 GLMError（中文），便于一线排查
+
 ## [v0.1.0] - 2026-10-03
 ### Added
 - Docker 化交付：Dockerfile / entrypoint.sh / docker-compose.yml，
