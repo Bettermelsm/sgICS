@@ -1,0 +1,7 @@
+{% extends "admin/login.html" %}
+
+{# 登录页的 usertools 块被官方模板清空，版本号改放在表单下方 #}
+{% block content %}
+{{ block.super }}
+<div style="text-align: center; margin-top: 18px; color: #888; font-size: 12px;">v{{ cs_version }}</div>
+{% endblock %}
