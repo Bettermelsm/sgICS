@@ -19,6 +19,8 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--real', action='store_true', help='使用真实 GLM（需配置 ZHIPU_API_KEY）')
+        parser.add_argument('--multi', action='store_true',
+                            help='多轮对话演示：同一客户连续追问，验证上下文传递（建议配合 --real）')
 
     def handle(self, *args, **options):
         use_real = options['real']
@@ -54,7 +56,22 @@ class Command(BaseCommand):
             '我要找人工客服投诉',           # 转人工关键词
             '这件衣服掉色吗？',             # AI 兜底（或转人工后不再回复）
         ]
-        history = []
+        if options['multi']:
+            # 多轮对话：新会话，同一客户连续追问，验证上下文传递
+            session, _ = ChatSession.objects.get_or_create(
+                shop=shop, customer_id='demo_customer_002',
+                defaults={'customer_name': '多轮演示客户'})
+            state = {'is_transferred': session.is_transferred,
+                     'ai_fail_count': session.ai_fail_count}
+            demo_texts = [
+                '这件衣服有红色吗？',
+                '那白色呢？',          # 依赖上一轮的"这件衣服"
+                '帮我推荐一件吧',       # 依赖全部上下文
+            ]
+            history = []
+            self.stdout.write('\n---- 多轮对话演示（同一会话，上下文累积） ----')
+        else:
+            history = []
         for text in demo_texts:
             result = pipeline.handle(text, history, state)
             history.append({'role': 'user', 'content': text})
