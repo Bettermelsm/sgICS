@@ -1,0 +1,39 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>话术测试</h1>
+<p style="color:#666">输入一句话，查看会命中哪条规则 / 转人工 / AI 兜底。只测试，不入库、不发送。</p>
+<form method="post">
+  {% csrf_token %}
+  <p>
+    <label>店铺：
+      <select name="shop">
+        {% for s in shops %}
+        <option value="{{ s.id }}"{% if shop and s.id == shop.id %} selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </p>
+  <p>
+    <label>客户消息：<br>
+      <textarea name="text" rows="3" cols="70">{{ text }}</textarea>
+    </label>
+  </p>
+  <p><button type="submit" class="default">测试</button></p>
+</form>
+
+{% if result %}
+<hr>
+<h2>测试结果</h2>
+<table style="border-collapse:collapse">
+  <tr><th style="text-align:left;padding:6px 12px 6px 0">决策来源</th>
+      <td><strong>{{ result.source }}</strong>
+        （{% for k, v in source_labels.items %}{% if k == result.source %}{{ v }}{% endif %}{% endfor %}）</td></tr>
+  <tr><th style="text-align:left;padding:6px 12px 6px 0">命中说明</th><td>{{ result.detail|default:"—" }}</td></tr>
+  <tr><th style="text-align:left;padding:6px 12px 6px 0">系统回复</th>
+      <td style="background:#f7f9fb;padding:8px 12px;border-radius:4px">{{ result.reply }}</td></tr>
+  <tr><th style="text-align:left;padding:6px 12px 6px 0">耗时</th><td>{{ result.latency_ms }} ms</td></tr>
+</table>
+<p><a href="../">← 返回关键词规则</a></p>
+{% endif %}
+{% endblock %}
