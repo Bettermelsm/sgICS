@@ -42,5 +42,5 @@ class GuideCardsTests(TestCase):
         resp = self.client.get('/admin/')
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, '工作台使用指南')
-        for title in ('建店铺', '配话术', '接飞鸽', '收草稿'):
+        for title in ('建店铺', '配话术', '接客服', '收草稿'):
             self.assertContains(resp, title)

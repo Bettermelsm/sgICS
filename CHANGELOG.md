@@ -2,6 +2,23 @@
 
 格式：`## [版本号] - 日期`，下挂 Added / Changed / Fixed。
 
+## [v0.4.0] - 2026-10-05
+### Added
+- Mock 抖店工作台（`adapters/mock_workbench.html`）：模拟"商家后台 → 右上角「网页版飞鸽」"两步进入，
+  含扫码登录遮罩（localStorage 持久模拟 cookie）、会话列表、消息面板、发送/转人工按钮，
+  动作写入隐藏日志供自动化断言
+- `demo_adapter --mock` 命令：Docker 里离线跑通 登录→轮询→发送→转人工 全流程（真实浏览器验证）
+- 话术测试器：Admin → 关键词规则 →「话术测试」，输入一句话即显示命中哪条规则 / 转人工 / AI 兜底，
+  含命中说明与耗时，只测试不入库不发送
+- `pipeline_for_shop()` / `ruleset_for_shop()`：规则装配逻辑抽为共用函数（命令与 admin 视图共用）
+- `PipelineResult.detail`：命中说明字段（命中哪条规则/关键词/AI 兜底）
+### Changed
+- 适配器入口两步化：商家后台 → 点「网页版飞鸽」（支持新标签页切换）；入口 URL 改由 `DOUYIN_ENTRY_URL`
+  环境变量配置（fxg.jinritemai.com 已变为抖店官网，不再硬编码为工作台地址）
+- 术语统一：用户界面统一称"抖店客服工作台"，"飞鸽"仅保留为产品原名备注
+### Fixed
+- `poll_douyin` 复用 `pipeline_for_shop()`，消除规则装配重复代码
+
 ## [v0.3.2] - 2026-10-05
 ### Added
 - Admin 首页引导卡片：01 建店铺 / 02 配话术 / 03 接飞鸽 / 04 收草稿，

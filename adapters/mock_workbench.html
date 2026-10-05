@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>抖店商家后台（Mock，仅供适配器联调）</title>
+<style>
+  body { font-family: sans-serif; margin: 0; }
+  header { background: #16181d; color: #fff; padding: 12px 20px;
+           display: flex; justify-content: space-between; align-items: center; }
+  header button { padding: 8px 16px; cursor: pointer; }
+  .layout { display: flex; height: calc(100vh - 60px); }
+  aside { width: 280px; border-right: 1px solid #ddd; overflow-y: auto; }
+  .session-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; }
+  .session-item.active { background: #e8f0fe; }
+  .session-item .nm { font-weight: bold; }
+  .session-item .pv { color: #666; font-size: 13px; margin-top: 4px; }
+  .session-item .ur { float: right; background: #f44336; color: #fff;
+                      border-radius: 10px; padding: 0 8px; font-size: 12px; }
+  main { flex: 1; display: flex; flex-direction: column; }
+  #message-panel { flex: 1; padding: 16px; overflow-y: auto; background: #f5f5f5; }
+  .msg { background: #fff; border-radius: 8px; padding: 8px 12px;
+         margin-bottom: 8px; max-width: 70%; }
+  #input-area { border-top: 1px solid #ddd; padding: 12px; }
+  #input-area [data-testid="input-box"] { border: 1px solid #ccc; border-radius: 4px;
+      min-height: 60px; padding: 8px; margin-bottom: 8px; }
+  #input-area button { padding: 8px 20px; margin-right: 8px; cursor: pointer; }
+  #login-mask { position: fixed; inset: 0; background: rgba(0,0,0,.55);
+                display: flex; align-items: center; justify-content: center; z-index: 99; }
+  #login-mask .box { background: #fff; padding: 32px; border-radius: 8px; text-align: center; }
+  #send-log { display: none; }
+</style>
+</head>
+<body>
+
+<!-- ===== 商家后台首页 ===== -->
+<div id="seller-home" data-testid="seller-home">
+  <header>
+    <span>抖店商家后台（Mock）</span>
+    <button data-testid="feige-entry">网页版飞鸽</button>
+  </header>
+  <p style="padding:20px">这里是模拟的商家后台首页。点右上角「网页版飞鸽」进入客服工作台。</p>
+</div>
+
+<!-- ===== 飞鸽工作台 ===== -->
+<div id="feige-workbench" data-testid="workbench" style="display:none">
+  <header>
+    <span>飞鸽客服工作台（Mock）</span>
+    <span data-testid="login-ok" style="display:none">已登录</span>
+  </header>
+
+  <!-- 登录遮罩：模拟扫码 -->
+  <div id="login-mask" data-testid="login-mask">
+    <div class="box" data-testid="qr-box">
+      <p>[二维码占位]</p>
+      <button data-testid="mock-scan">模拟扫码登录</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <aside data-testid="session-list">
+      <div class="session-item" data-testid="session-item" data-session="cust_001">
+        <span class="ur" data-testid="unread">1</span>
+        <div class="nm" data-testid="session-name">客户A</div>
+        <div class="pv" data-testid="session-last-msg">请问什么时候发货？</div>
+      </div>
+      <div class="session-item" data-testid="session-item" data-session="cust_002">
+        <span class="ur" data-testid="unread">2</span>
+        <div class="nm" data-testid="session-name">客户B</div>
+        <div class="pv" data-testid="session-last-msg">我要找人工投诉</div>
+      </div>
+    </aside>
+    <main>
+      <div id="message-panel" data-testid="message-panel">
+        <div class="msg" data-testid="message-item">
+          <span data-testid="msg-text">请问什么时候发货？</span>
+        </div>
+        <div class="msg" data-testid="message-item">
+          <span data-testid="msg-text">我要找人工投诉</span>
+        </div>
+      </div>
+      <div id="input-area" data-testid="input-area">
+        <div data-testid="input-box" contenteditable="true"></div>
+        <div>
+          <button data-testid="send-button">发送</button>
+          <button data-testid="transfer-button">转人工</button>
+        </div>
+      </div>
+      <!-- 动作记录：供自动化断言 -->
+      <div id="send-log" data-testid="send-log"></div>
+    </main>
+  </div>
+</div>
+
+<script>
+// 登录态持久（模拟真实站点的 cookie / storage_state）
+if (localStorage.getItem('mock_logged_in') === '1') {
+  document.getElementById('login-mask').style.display = 'none';
+  document.querySelector('[data-testid="login-ok"]').style.display = 'inline';
+}
+// 步骤一：商家后台 → 点「网页版飞鸽」
+document.querySelector('[data-testid="feige-entry"]').addEventListener('click', () => {
+  document.getElementById('seller-home').style.display = 'none';
+  document.getElementById('feige-workbench').style.display = 'block';
+});
+// 模拟扫码登录
+document.querySelector('[data-testid="mock-scan"]').addEventListener('click', () => {
+  localStorage.setItem('mock_logged_in', '1');
+  document.getElementById('login-mask').style.display = 'none';
+  document.querySelector('[data-testid="login-ok"]').style.display = 'inline';
+});
+// 会话切换高亮
+document.querySelectorAll('[data-testid="session-item"]').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('[data-testid="session-item"]')
+      .forEach(x => x.classList.remove('active'));
+    el.classList.add('active');
+  });
+});
+// 发送：记录到 send-log
+document.querySelector('[data-testid="send-button"]').addEventListener('click', () => {
+  const box = document.querySelector('[data-testid="input-box"]');
+  const log = document.querySelector('[data-testid="send-log"]');
+  log.textContent += 'SENT:' + box.innerText.trim() + '\n';
+  box.innerText = '';
+});
+// 转人工：记录到 send-log
+document.querySelector('[data-testid="transfer-button"]').addEventListener('click', () => {
+  document.querySelector('[data-testid="send-log"]').textContent += 'TRANSFER\n';
+});
+</script>
+</body>
+</html>

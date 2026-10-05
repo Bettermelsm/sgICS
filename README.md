@@ -2,7 +2,7 @@
 
 Django 自研路线第一步：**大脑先跑通**。本 demo 实现原 ChatGPT-On-CS 的
 回复流水线（转人工 → 关键词 → AI兜底 → 默认回复 → 出站替换），
-LLM 接智谱 GLM，抖店（飞鸽）适配器以 Playwright 网页自动化为方案（骨架已就绪，
+LLM 接智谱 GLM，抖店客服适配器（飞鸽工作台）以 Playwright 网页自动化为方案（骨架已就绪，
 真实店铺联调为下一版本）。
 
 ## 零、Docker 一行启动（v0.1 推荐）
@@ -30,6 +30,8 @@ docker compose up --build
   `docker compose exec web python manage.py check_glm`
 - 真实 GLM 演示：`docker compose exec web python manage.py demo_pipeline --real`
 - 真实 GLM 多轮演示：`docker compose exec web python manage.py demo_pipeline --real --multi`
+- 适配器全流程演示（Mock 工作台，离线可跑）：
+  `docker compose exec web python manage.py demo_adapter --mock`
 - 跑单测：`docker compose exec web python manage.py test`
 - 数据持久化在 Docker 卷 `csdata` 中，重建容器不丢
 
