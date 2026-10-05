@@ -35,8 +35,9 @@ class GLMGatewayTest(SimpleTestCase):
     def test_auth_error_chinese(self):
         err = openai_pkg.AuthenticationError('bad key',
                                              response=mock.MagicMock(), body=None)
-        with mock.patch.object(openai_pkg, 'OpenAI', return_value=_resp()) as m:
-            m.chat.completions.create.side_effect = err
+        client = _resp()
+        client.chat.completions.create.side_effect = err
+        with mock.patch.object(openai_pkg, 'OpenAI', return_value=client):
             with self.assertRaises(GLMError) as ctx:
                 _gw().chat([])
             self.assertIn('API Key 无效', str(ctx.exception))
@@ -44,8 +45,9 @@ class GLMGatewayTest(SimpleTestCase):
     def test_rate_limit_chinese(self):
         err = openai_pkg.RateLimitError('slow down',
                                         response=mock.MagicMock(), body=None)
-        with mock.patch.object(openai_pkg, 'OpenAI', return_value=_resp()) as m:
-            m.chat.completions.create.side_effect = err
+        client = _resp()
+        client.chat.completions.create.side_effect = err
+        with mock.patch.object(openai_pkg, 'OpenAI', return_value=client):
             with self.assertRaises(GLMError) as ctx:
                 _gw().chat([])
             self.assertIn('限流', str(ctx.exception))
@@ -85,8 +87,9 @@ class GLMGatewayTest(SimpleTestCase):
 
     def test_ping_fail(self):
         err = openai_pkg.AuthenticationError('bad', response=mock.MagicMock(), body=None)
-        with mock.patch.object(openai_pkg, 'OpenAI', return_value=_resp()) as m:
-            m.chat.completions.create.side_effect = err
+        client = _resp()
+        client.chat.completions.create.side_effect = err
+        with mock.patch.object(openai_pkg, 'OpenAI', return_value=client):
             ok, ms, msg = _gw().ping()
             self.assertFalse(ok)
             self.assertIn('API Key 无效', msg)
