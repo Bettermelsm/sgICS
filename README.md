@@ -96,13 +96,18 @@ python manage.py demo_pipeline --real    :: 调真实 GLM（需先配 ZHIPU_API_
 python manage.py test
 ```
 
-## 五、第二步：接真实抖店（待联调）
+## 五、第二步：接真实抖店（v0.3 联调中）
 
-1. `adapters/douyin.py` 已有骨架与联调清单，按清单实现四个动作
-2. 首次在演示机上人工扫码登录飞鸽一次，保存登录态文件
-3. **强烈建议**：真实店铺测试全程保持"草稿模式"（店铺账号 → 自动回复关闭），
-   只生成回复建议、人工确认后发送，避免自动回复打扰真实客户
-4. 稳定后再评估是否打开自动回复（建议仅关键词类高置信回复自动发，AI兜底保持人工确认）
+详见 `docs/DOUYIN.md` 联调手册。三条命令：
+
+```bash
+docker compose exec web python manage.py login_douyin              # 扫码登录
+docker compose exec web python manage.py poll_douyin --shop-id 2 --once   # 单轮试跑
+docker compose exec web python manage.py poll_douyin --shop-id 2   # 持续轮询
+```
+
+**铁律**：v0.3 全程草稿模式，只收消息、只存草稿，不发送。
+真实发送与转人工验证留到 v0.4。
 
 ## 六、后续演进方向
 
