@@ -6,7 +6,7 @@ class ShopAccount(models.Model):
     """店铺账号（一个平台的一家店）。"""
 
     PLATFORM_CHOICES = [
-        ('douyin', '抖店/飞鸽'),
+        ('douyin', '抖店客服'),
     ]
 
     name = models.CharField('店铺名称', max_length=100)

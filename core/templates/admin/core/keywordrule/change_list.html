@@ -1,0 +1,9 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools %}
+{{ block.super }}
+<div style="margin: 12px 0;">
+  <a href="test/" class="button">话术测试</a>
+  <span style="color:#888;font-size:12px;margin-left:8px">输入一句话，验证规则命中效果（不入库）</span>
+</div>
+{% endblock %}

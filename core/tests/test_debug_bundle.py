@@ -14,7 +14,7 @@ class FakePage:
         self._fail_shot = fail_screenshot
 
     def title(self):
-        return '飞鸽工作台'
+        return '抖店客服工作台'
 
     def screenshot(self, path, full_page=False):
         if self._fail_shot:

@@ -1,13 +1,15 @@
-"""抖店 / 飞鸽 Playwright 适配器（v0.3）。
+"""抖店客服系统（飞鸽工作台）Playwright 适配器（v0.4）。
 
 实现：扫码登录（保存登录态）/ 轮询新消息 / 发送 / 转人工。
 安全：本适配器只做"手脚"，发不发送由上层命令决定；
-v0.3 的 poll_douyin 命令全程草稿模式，永不调用 send_message。
+poll_douyin 命令全程草稿模式，永不调用 send_message。
 
-关于 SELECTORS：飞鸽工作台 DOM 未经真实环境验证，
-字典中的值为占位候选。首次运行失败会自动产出诊断包
-（debug/ 目录：截图 + dom.html + info.txt），
-把 dom.html 发给开发者即可校准 selector，第二轮即通。
+入口（2026-10-05 查证）：fxg.jinritemai.com 已变为抖店官网，
+网页版飞鸽改从抖店商家后台右上角进入。真实入口用 DOUYIN_ENTRY_URL
+环境变量覆盖；离线验证用 DOUYIN_MOCK_PAGE 指向 mock_workbench.html。
+
+关于 SELECTORS：data-testid 条目对应 Mock 页；真实环境用诊断包
+dom.html 校准后追加到各候选列表。
 """
 import hashlib
 import os
@@ -19,6 +21,11 @@ from .debug import DebugBundle
 
 WORKBENCH_URL = 'https://fxg.jinritemai.com/'
 
+# 入口说明（2026-10-05 查证）：fxg.jinritemai.com 现已变为抖店官网（商家入驻页），
+# 网页版飞鸽改从抖店商家后台右上角进入。真实使用时用 DOUYIN_ENTRY_URL 环境变量覆盖。
+ENTRY_URL = os.environ.get('DOUYIN_ENTRY_URL', WORKBENCH_URL)
+MOCK_PAGE = os.environ.get('DOUYIN_MOCK_PAGE', '')
+
 # 登录态 / 诊断包路径：Docker 里通过环境变量指向 /data 卷（重建不丢）
 DEFAULT_STATE_PATH = os.environ.get('DOUYIN_STATE_PATH', 'douyin_state.json')
 DEFAULT_DEBUG_DIR = os.environ.get('DOUYIN_DEBUG_DIR', 'debug')
@@ -26,21 +33,36 @@ DEFAULT_DEBUG_DIR = os.environ.get('DOUYIN_DEBUG_DIR', 'debug')
 # 登录页 URL 关键词：命中即视为"未登录"
 LOGIN_PAGE_KEYWORDS = ('passport', 'login', 'sso', 'auth')
 
-# --- 选择器候选表（待真实环境校准，见模块 docstring）---
+# --- 选择器候选表 ---
+# data-testid 开头的条目对应 adapters/mock_workbench.html（Mock 页）；
+# 真实环境用诊断包 dom.html 校准后追加到各候选列表。
 SELECTORS = {
+    # 两步进入：商家后台右上角「网页版飞鸽」
+    'feige_entry': ['[data-testid="feige-entry"]'],
     # 登录成功标志（任一命中即认为已登录；为空则只用 URL 启发式判断）
-    'login_success': [],
+    'login_success': ['[data-testid="login-ok"]:not([style*="none"])'],
+    # Mock 登录遮罩（visible=未登录）
+    'login_mask': ['[data-testid="login-mask"]'],
+    'mock_scan_button': ['[data-testid="mock-scan"]'],
     # 会话列表容器
-    'session_list': ['[class*="session"]', '[class*="conversation"]'],
+    'session_list': ['[data-testid="session-list"]',
+                     '[class*="session"]', '[class*="conversation"]'],
     # 单条会话项
-    'session_item': ['[class*="session-item"]', '[class*="conv-item"]'],
+    'session_item': ['[data-testid="session-item"]',
+                     '[class*="session-item"]', '[class*="conv-item"]'],
     # 会话项内的客户名 / 最后一条消息 / 未读数
-    'session_name': ['[class*="name"]', '[class*="nickname"]'],
-    'session_last_msg': ['[class*="last-msg"]', '[class*="preview"]'],
+    'session_name': ['[data-testid="session-name"]',
+                     '[class*="name"]', '[class*="nickname"]'],
+    'session_last_msg': ['[data-testid="session-last-msg"]',
+                         '[class*="last-msg"]', '[class*="preview"]'],
     # 消息输入框 / 发送按钮 / 转人工按钮
-    'input_box': ['[contenteditable="true"]', 'textarea[class*="input"]'],
-    'send_button': ['button[class*="send"]'],
-    'transfer_button': ['button[class*="transfer"]', '[class*="转人工"]'],
+    'input_box': ['[data-testid="input-box"]',
+                  '[contenteditable="true"]', 'textarea[class*="input"]'],
+    'send_button': ['[data-testid="send-button"]', 'button[class*="send"]'],
+    'transfer_button': ['[data-testid="transfer-button"]',
+                        'button[class*="transfer"]', '[class*="转人工"]'],
+    # 动作记录（Mock 页供断言用）
+    'send_log': ['[data-testid="send-log"]'],
 }
 
 QR_SCREENSHOT = 'qr.png'
@@ -51,10 +73,12 @@ class DouyinAdapter(BaseAdapter):
     name = 'douyin'
 
     def __init__(self, storage_state_path=None, headless=True,
-                 debug_dir=None):
+                 debug_dir=None, mock_path=None):
         self.storage_state_path = Path(storage_state_path or DEFAULT_STATE_PATH)
         self.headless = headless
         self.debug_dir = debug_dir or DEFAULT_DEBUG_DIR
+        # mock_path：指向 adapters/mock_workbench.html 做离线全流程验证
+        self.mock_path = mock_path or MOCK_PAGE or None
         self._pw = None
         self._browser = None
         self._page = None
@@ -76,8 +100,17 @@ class DouyinAdapter(BaseAdapter):
         self._page = ctx.new_page()
         return self._page
 
-    @staticmethod
-    def _is_logged_in(page) -> bool:
+    def _entry_url(self) -> str:
+        if self.mock_path:
+            return Path(self.mock_path).resolve().as_uri()
+        return ENTRY_URL
+
+    def _is_logged_in(self, page) -> bool:
+        if self.mock_path:
+            try:
+                return not page.locator('[data-testid="login-mask"]').is_visible()
+            except Exception:
+                return False
         url = page.url.lower()
         if any(k in url for k in LOGIN_PAGE_KEYWORDS):
             return False
@@ -87,31 +120,61 @@ class DouyinAdapter(BaseAdapter):
                     return True
             except Exception:
                 pass
-        # login_success 为空时：URL 不含登录关键词即视为已登录
-        return not SELECTORS['login_success'] or False
+        # 真实环境启发式：URL 不含登录关键词即视为已登录
+        # （login_success 的 data-testid 选择器仅 Mock 页有效）
+        return True
+
+    def _enter_workbench(self, page, dbg):
+        """两步进入：商家后台 → 点「网页版飞鸽」→ 工作台。"""
+        url = self._entry_url()
+        dbg.note(f'打开入口：{url}')
+        page.goto(url, wait_until='domcontentloaded', timeout=60000)
+        page.wait_for_timeout(2000)
+        entry = self._first_hit(page, SELECTORS['feige_entry'], '「网页版飞鸽」入口')
+        if self.mock_path:
+            entry.click()
+            page.wait_for_timeout(1000)
+            return page
+        # 真实环境：点击后可能新开标签页
+        try:
+            with page.context.expect_page(timeout=10000) as new_page_info:
+                entry.click()
+            new_page = new_page_info.value
+            new_page.wait_for_load_state('domcontentloaded', timeout=30000)
+            dbg.note('检测到新标签页，已切换')
+            self._page = new_page
+            return new_page
+        except Exception:
+            dbg.note('未检测到新标签页，继续当前页')
+            page.wait_for_timeout(2000)
+            return page
 
     # ---------- 契约实现 ----------
     def login(self) -> bool:
-        """扫码登录：无登录态时截图二维码，用户手机扫码后保存登录态。"""
+        """扫码登录：无登录态时截图二维码，用户手机扫码后保存登录态。
+        Mock 模式：点击「模拟扫码登录」按钮。"""
         page = self._new_page()
         with DebugBundle(page, name='login', out_dir=self.debug_dir) as dbg:
-            dbg.note(f'打开飞鸽工作台：{WORKBENCH_URL}')
-            page.goto(WORKBENCH_URL, wait_until='domcontentloaded', timeout=60000)
-            page.wait_for_timeout(3000)
+            page = self._enter_workbench(page, dbg)
             if self._is_logged_in(page):
                 dbg.note('登录态有效，无需扫码')
                 return True
-            dbg.note('需要扫码登录，截取二维码…')
-            page.screenshot(path=QR_SCREENSHOT)
-            print(f'\n请用手机抖音/抖店 App 扫描二维码：{Path(QR_SCREENSHOT).resolve()}', flush=True)
-            print(f'等待扫码（{LOGIN_WAIT_SECONDS} 秒超时）…', flush=True)
-            deadline = time.time() + LOGIN_WAIT_SECONDS
-            while time.time() < deadline:
-                page.wait_for_timeout(3000)
-                if self._is_logged_in(page):
-                    break
+            if self.mock_path:
+                dbg.note('Mock 模式：点击模拟扫码登录')
+                page.locator('[data-testid="mock-scan"]').click()
+                page.wait_for_timeout(1000)
             else:
-                raise TimeoutError('扫码登录超时，请重试（二维码已刷新请重新截图）')
+                dbg.note('需要扫码登录，截取二维码…')
+                page.screenshot(path=QR_SCREENSHOT)
+                print(f'\n请用手机抖音/抖店 App 扫描二维码：{Path(QR_SCREENSHOT).resolve()}', flush=True)
+                print(f'等待扫码（{LOGIN_WAIT_SECONDS} 秒超时）…', flush=True)
+                deadline = time.time() + LOGIN_WAIT_SECONDS
+                while time.time() < deadline:
+                    page.wait_for_timeout(3000)
+                    if self._is_logged_in(page):
+                        break
+                else:
+                    raise TimeoutError('扫码登录超时，请重试（二维码已刷新请重新截图）')
             self._page.context.storage_state(path=str(self.storage_state_path))
             dbg.note(f'登录成功，登录态已保存：{self.storage_state_path}')
             return True
@@ -120,11 +183,8 @@ class DouyinAdapter(BaseAdapter):
         """轮询会话列表，返回新增的 [IncomingMessage]（内存 + DB 双重去重）。"""
         if self._page is None:
             self.login()
-        page = self._page
-        with DebugBundle(page, name='poll', out_dir=self.debug_dir) as dbg:
-            dbg.note('拉取会话列表…')
-            page.goto(WORKBENCH_URL, wait_until='domcontentloaded', timeout=60000)
-            page.wait_for_timeout(3000)
+        with DebugBundle(self._page, name='poll', out_dir=self.debug_dir) as dbg:
+            page = self._enter_workbench(self._page, dbg)
             if not self._is_logged_in(page):
                 raise RuntimeError('登录态失效，请重新运行 login_douyin 扫码登录')
             raw = self._extract_messages(page, dbg)

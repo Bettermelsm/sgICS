@@ -18,6 +18,7 @@ class PipelineResult:
     transferred: bool = False  # 本轮是否触发了转人工
     should_send: bool = False  # 是否允许自动发送（草稿模式下为 False）
     latency_ms: int = 0
+    detail: str = ''  # 命中说明（如"关键词规则：发货（优先级10）"），供测试器展示
 
 
 @dataclass
@@ -69,16 +70,18 @@ class ReplyPipeline:
                 result.transferred = True
                 result.source = 'transfer'
                 result.reply = '已为您转接人工客服，请稍候~'
+                result.detail = f'命中转人工关键词：{kw.strip()}'
                 result.should_send = self.auto_reply
                 result.latency_ms = self._ms(start)
                 return result
 
         # 3. 关键词规则（按优先级）
-        for keywords_str, reply, _priority in sorted(self.rules.keyword_rules,
-                                                     key=lambda r: r[2], reverse=True):
+        for keywords_str, reply, priority in sorted(self.rules.keyword_rules,
+                                                    key=lambda r: r[2], reverse=True):
             if _hit(text, keywords_str):
                 result.source = 'keyword'
                 result.reply = self._apply_replace(reply)
+                result.detail = f'命中关键词规则：{keywords_str.strip()}（优先级{priority}）'
                 result.should_send = self.auto_reply
                 result.latency_ms = self._ms(start)
                 return result
@@ -91,6 +94,7 @@ class ReplyPipeline:
                 session_state['ai_fail_count'] = 0
                 result.source = 'ai'
                 result.reply = self._apply_replace(ai_reply.strip())
+                result.detail = f'AI 兜底（{self.llm.name}）'
                 result.should_send = self.auto_reply
                 result.latency_ms = self._ms(start)
                 return result
@@ -111,6 +115,7 @@ class ReplyPipeline:
         # 5. 默认回复
         result.source = 'default'
         result.reply = self._apply_replace(self.default_reply)
+        result.detail = '默认回复（无规则命中且 AI 不可用）'
         result.should_send = self.auto_reply
         result.latency_ms = self._ms(start)
         return result
@@ -134,3 +139,23 @@ class ReplyPipeline:
     @staticmethod
     def _ms(start: float) -> int:
         return int((time.time() - start) * 1000)
+
+
+def ruleset_for_shop(shop) -> RuleSet:
+    """从 DB 装配某店铺的规则集合（供命令与 admin 视图共用）。"""
+    from .models import KeywordRule, ReplaceRule, TransferRule
+    return RuleSet(
+        keyword_rules=[(r.keywords, r.reply, r.priority)
+                       for r in KeywordRule.objects.filter(shop=shop, is_active=True)],
+        transfer_keywords=[r.keywords
+                           for r in TransferRule.objects.filter(shop=shop, is_active=True)],
+        replace_rules=[(r.pattern, r.replacement)
+                       for r in ReplaceRule.objects.filter(shop=shop, is_active=True)],
+    )
+
+
+def pipeline_for_shop(shop, llm=None, auto_reply: bool = False) -> ReplyPipeline:
+    """为某店铺装配好流水线（规则来自 DB，LLM 默认按环境自动选择）。"""
+    from .llm_gateway import build_gateway
+    return ReplyPipeline(llm=llm or build_gateway(), rules=ruleset_for_shop(shop),
+                         auto_reply=auto_reply, shop_name=shop.name)

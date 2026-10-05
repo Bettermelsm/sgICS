@@ -39,8 +39,8 @@ def workbench_guide(request):
             'url': reverse('admin:core_keywordrule_changelist'), 'action': '去配话术',
         },
         {
-            'num': '03', 'title': '接飞鸽', 'done': state_ok,
-            'desc': 'WSL 里跑 python manage.py login_douyin，手机扫码登录飞鸽工作台（详见 docs/DOUYIN.md）。',
+            'num': '03', 'title': '接客服', 'done': state_ok,
+            'desc': 'WSL 里跑 python manage.py login_douyin，手机扫码登录抖店客服工作台（飞鸽）（详见 docs/DOUYIN.md）。',
             'status': '登录态已保存' if state_ok else '未登录，扫码后这里会变绿',
             'url': None, 'action': '跑 login_douyin 命令',
         },

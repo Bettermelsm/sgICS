@@ -1,4 +1,4 @@
-"""飞鸽扫码登录：打开工作台 → 截图二维码 → 用户手机扫码 → 保存登录态。
+"""抖店客服工作台扫码登录：打开工作台 → 截图二维码 → 用户手机扫码 → 保存登录态。
 
 用法：
     python manage.py login_douyin
@@ -11,7 +11,7 @@ from adapters.douyin import DouyinAdapter, QR_SCREENSHOT
 
 
 class Command(BaseCommand):
-    help = '飞鸽工作台扫码登录并保存登录态'
+    help = '抖店客服工作台扫码登录并保存登录态'
 
     def handle(self, *args, **opts):
         adapter = DouyinAdapter()

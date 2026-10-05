@@ -1,4 +1,4 @@
-"""消息泵：轮询飞鸽 → 去重入库 → 走回复流水线 → 存草稿。
+"""消息泵：轮询抖店客服工作台 → 去重入库 → 走回复流水线 → 存草稿。
 
 安全铁律（v0.3）：全程草稿模式，永不调用 adapter.send_message。
 即使店铺开了 auto_reply，本命令也只存草稿不发送。
@@ -14,10 +14,8 @@ import traceback
 from django.core.management.base import BaseCommand
 
 from adapters.douyin import DouyinAdapter
-from core.llm_gateway import build_gateway
-from core.models import (ChatMessage, ChatSession, KeywordRule, ReplyLog,
-                         ReplaceRule, ShopAccount, TransferRule)
-from core.pipeline import ReplyPipeline, RuleSet
+from core.models import ChatMessage, ChatSession, ReplyLog, ShopAccount
+from core.pipeline import pipeline_for_shop
 
 # v0.3 安全开关：False = 只存草稿，绝不发送。v0.4 真实发送验证时再评审打开。
 ALLOW_SEND = False
@@ -26,7 +24,7 @@ HISTORY_LIMIT = 10
 
 
 class Command(BaseCommand):
-    help = '轮询飞鸽新消息并生成回复草稿（v0.3：只收不发）'
+    help = '轮询抖店客服新消息并生成回复草稿（v0.4：只收不发）'
 
     def add_arguments(self, parser):
         parser.add_argument('--shop-id', type=int, default=1)
@@ -57,16 +55,7 @@ class Command(BaseCommand):
             adapter.close()
 
     def _pump_once(self, adapter, shop) -> int:
-        rules = RuleSet(
-            keyword_rules=[(r.keywords, r.reply, r.priority)
-                           for r in KeywordRule.objects.filter(shop=shop, is_active=True)],
-            transfer_keywords=[r.keywords for r in TransferRule.objects.filter(shop=shop, is_active=True)],
-            replace_rules=[(r.pattern, r.replacement)
-                           for r in ReplaceRule.objects.filter(shop=shop, is_active=True)],
-        )
-        pipeline = ReplyPipeline(llm=build_gateway(), rules=rules,
-                                 auto_reply=False,  # v0.3 强制草稿
-                                 shop_name=shop.name)
+        pipeline = pipeline_for_shop(shop, auto_reply=False)  # v0.3 强制草稿
         incoming = adapter.poll_new_messages()
         done = 0
         for m in incoming:
