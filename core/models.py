@@ -14,6 +14,10 @@ class ShopAccount(models.Model):
     is_active = models.BooleanField('启用', default=True)
     # 草稿模式：只生成回复建议，不自动发送。demo/真实店铺测试阶段强烈建议保持开启。
     auto_reply = models.BooleanField('自动回复（关闭=草稿模式）', default=False)
+    # v0.5：人工审核发送开关。关闭时 Admin 里看得到草稿，但"批准发送"会被风控拒绝。
+    manual_send_enabled = models.BooleanField(
+        '允许人工审核发送', default=False,
+        help_text='开启后，管理员可在"回复日志"中人工批准发送草稿。默认关闭。')
     created_at = models.DateTimeField('创建时间', auto_now_add=True)
 
     class Meta:
@@ -111,7 +115,15 @@ class ReplaceRule(models.Model):
 
 
 class ReplyLog(models.Model):
-    """每次自动决策的记录：输入、决策来源、结果、耗时。"""
+    """每次自动决策的记录：输入、决策来源、结果、耗时。v0.5 起兼作草稿审核单。"""
+
+    STATUS_CHOICES = [
+        ('draft', '草稿'),
+        ('sent', '已发送'),
+        ('transferred', '已转人工'),
+        ('rejected', '已驳回'),
+        ('failed', '发送失败'),
+    ]
 
     session = models.ForeignKey(ChatSession, verbose_name='会话', on_delete=models.CASCADE)
     incoming = models.TextField('客户消息')
@@ -119,8 +131,32 @@ class ReplyLog(models.Model):
     source = models.CharField('决策来源', max_length=20, help_text='transfer / keyword / ai / default')
     latency_ms = models.IntegerField('耗时毫秒', default=0)
     created_at = models.DateTimeField('时间', auto_now_add=True)
+    # v0.5 审核流
+    status = models.CharField('状态', max_length=20, choices=STATUS_CHOICES, default='draft')
+    reviewed_by = models.CharField('审核人', max_length=100, blank=True, default='')
+    reviewed_at = models.DateTimeField('审核时间', null=True, blank=True)
+    sent_at = models.DateTimeField('发送时间', null=True, blank=True)
+    send_error = models.TextField('发送错误', blank=True, default='')
 
     class Meta:
         verbose_name = '回复日志'
         verbose_name_plural = '回复日志'
         ordering = ['-created_at']
+
+
+class PollerHeartbeat(models.Model):
+    """轮询服务心跳（每店一行）：最后轮询/成功时间、最后错误、连续失败数。"""
+
+    shop = models.OneToOneField(ShopAccount, verbose_name='店铺', on_delete=models.CASCADE)
+    last_run_at = models.DateTimeField('最后轮询', null=True, blank=True)
+    last_ok_at = models.DateTimeField('最后成功', null=True, blank=True)
+    last_error = models.TextField('最后错误', blank=True, default='')
+    consecutive_failures = models.IntegerField('连续失败次数', default=0)
+    updated_at = models.DateTimeField('更新时间', auto_now=True)
+
+    class Meta:
+        verbose_name = '轮询心跳'
+        verbose_name_plural = '轮询心跳'
+
+    def __str__(self):
+        return f'{self.shop.name} 心跳'

@@ -16,14 +16,25 @@ def workbench_guide(request):
     """Admin 首页引导卡片数据（编号步骤 + 一句话做法 + 实时状态）。"""
     if not request.path.startswith('/admin'):
         return {}
-    from .models import KeywordRule, ReplyLog, ShopAccount, TransferRule
+    from .models import KeywordRule, PollerHeartbeat, ReplyLog, ShopAccount, TransferRule
 
     shop_n = ShopAccount.objects.count()
     kw_n = KeywordRule.objects.filter(is_active=True).count()
     tr_n = TransferRule.objects.filter(is_active=True).count()
-    state_ok = Path(os.environ.get('DOUYIN_STATE_PATH', 'douyin_state.json')).exists()
+    state_path = Path(os.environ.get('DOUYIN_STATE_PATH', 'douyin_state.json'))
+    state_ok = state_path.exists()
     today_drafts = ReplyLog.objects.filter(
         created_at__date=timezone.now().date()).count()
+    # v0.5：poller 心跳
+    hb = PollerHeartbeat.objects.order_by('-updated_at').first()
+    if hb and hb.last_run_at:
+        ago = int((timezone.now() - hb.last_run_at).total_seconds() // 60)
+        if hb.consecutive_failures:
+            pump_status = f'轮询异常（连续失败 {hb.consecutive_failures} 次）：{hb.last_error[:40]}'
+        else:
+            pump_status = f'轮询正常（{ago} 分钟前）'
+    else:
+        pump_status = '还没跑过消息泵'
 
     cards = [
         {
@@ -47,7 +58,7 @@ def workbench_guide(request):
         {
             'num': '04', 'title': '收草稿', 'done': today_drafts > 0,
             'desc': '跑 python manage.py poll_douyin 收消息 → 走流水线 → 只存草稿；去「回复日志」审阅，人工决定发不发。',
-            'status': f'今日已存草稿 {today_drafts} 条' if today_drafts else '还没跑过消息泵',
+            'status': f'今日已存草稿 {today_drafts} 条；{pump_status}' if today_drafts else pump_status,
             'url': reverse('admin:core_replylog_changelist'), 'action': '看回复日志',
         },
     ]
