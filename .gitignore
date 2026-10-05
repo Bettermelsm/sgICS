@@ -4,4 +4,6 @@ __pycache__/
 db.sqlite3
 .env
 douyin_state.json
+qr.png
+debug/
 *.log

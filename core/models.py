@@ -56,12 +56,18 @@ class ChatMessage(models.Model):
     content = models.TextField('内容')
     source = models.CharField('回复来源', max_length=20, blank=True, default='',
                               help_text='keyword / ai / default / human / transfer')
+    # 平台原生消息 ID（适配器导入时填写），用于消息去重；NULL 允许多条（如 demo 数据）
+    external_id = models.CharField('平台消息ID', max_length=200, null=True, blank=True, default=None)
     created_at = models.DateTimeField('时间', auto_now_add=True)
 
     class Meta:
         verbose_name = '消息'
         verbose_name_plural = '消息'
         ordering = ['created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['session', 'external_id'],
+                                    name='uniq_session_external_id'),
+        ]
 
 
 class KeywordRule(models.Model):
