@@ -1,0 +1,50 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>审核草稿 #{{ log.id }}</h1>
+<p>状态：<strong>{{ log.get_status_display }}</strong>　
+   决策来源：{{ log.source }}　
+   客户：{{ log.session.customer_name|default:log.session.customer_id }}　
+   店铺：{{ log.session.shop.name }}</p>
+
+<h2>客户消息</h2>
+<blockquote>{{ log.incoming }}</blockquote>
+<h2>系统回复（草稿）</h2>
+<blockquote style="background:#f7f9fb;padding:8px 12px;border-radius:4px">{{ log.reply }}</blockquote>
+
+<h2>风控预检</h2>
+<table style="border-collapse:collapse">
+  {% for name, ok, note in report %}
+  <tr>
+    <td style="padding:6px 12px 6px 0">{{ name }}</td>
+    <td style="padding:6px 12px;color:{% if ok %}green{% else %}red{% endif %};font-weight:bold">
+      {% if ok %}通过{% else %}不通过{% endif %}</td>
+    <td style="padding:6px 12px;color:#666">{{ note }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+{% if log.status == 'draft' %}
+<hr>
+<p style="color:#a00">发送是真实动作，请确认内容无误。发送后不可撤回。</p>
+<form method="post" style="display:inline">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="send">
+  <button type="submit" class="default" onclick="return confirm('确认发送这条回复吗？')">确认发送</button>
+</form>
+<form method="post" style="display:inline;margin-left:12px">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="transfer">
+  <button type="submit" onclick="return confirm('确认转人工吗？')">转人工</button>
+</form>
+<form method="post" style="display:inline;margin-left:12px">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="reject">
+  <button type="submit">驳回</button>
+</form>
+{% else %}
+<p>该草稿已处理（{{ log.get_status_display }}），
+   审核人：{{ log.reviewed_by|default:"—" }}，时间：{{ log.reviewed_at|default:"—" }}</p>
+{% endif %}
+<p style="margin-top:16px"><a href="../../">← 返回回复日志</a></p>
+{% endblock %}

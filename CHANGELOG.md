@@ -2,6 +2,21 @@
 
 格式：`## [版本号] - 日期`，下挂 Added / Changed / Fixed。
 
+## [v0.5.0] - 2026-10-05
+### Added
+- 草稿审核流：ReplyLog 状态机（草稿/已发送/已转人工/已驳回/发送失败）+ 审核人/审核时间/发送时间审计；
+  Admin 回复日志每行「审核」入口，审核页展示风控预检，确认发送（二次确认）/ 转人工 / 驳回
+- 风控模块 `core/safety.py`：人工发送开关（每店默认关）、服务时间窗口（默认 9–23 北京时间）、
+  频率限制（默认每店每 10 分钟 20 条）、熔断（近 30 分钟失败 3 次停发）；计数走 DB 跨进程有效；
+  均可经环境变量调整（SEND_LIMIT_COUNT / SEND_LIMIT_MINUTES / SERVICE_HOURS / SEND_FAIL_STREAK_LIMIT）
+- 轮询服务化：`poll_douyin` 默认轮询全部启用店铺，SIGTERM/SIGINT 优雅退出，失败指数退避；
+  docker-compose 新增 `poller` 常驻服务
+- `PollerHeartbeat` 心跳模型 + `check_douyin` 登录态检查命令；引导卡片 04 显示最后轮询时间/异常
+- `DouyinAdapter.check_login()`：轻量登录态检查（不触发扫码流程），login() 复用
+### Changed
+- `poll_douyin --shop-id` 默认为空 = 全部启用店铺（原默认 shop-id 1）
+- 真实发送唯一入口为 Admin 人工审核；`poll_douyin` 的 ALLOW_SEND=False 断言保留
+
 ## [v0.4.0] - 2026-10-05
 ### Added
 - Mock 抖店工作台（`adapters/mock_workbench.html`）：模拟"商家后台 → 右上角「网页版飞鸽」"两步进入，

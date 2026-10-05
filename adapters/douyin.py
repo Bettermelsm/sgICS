@@ -150,15 +150,23 @@ class DouyinAdapter(BaseAdapter):
             return page
 
     # ---------- 契约实现 ----------
+    def check_login(self) -> bool:
+        """轻量登录态检查：只判断，不触发扫码流程。"""
+        page = self._new_page()
+        with DebugBundle(page, name='check', out_dir=self.debug_dir) as dbg:
+            page = self._enter_workbench(page, dbg)
+            ok = self._is_logged_in(page)
+            dbg.note(f'登录态检查：{"有效" if ok else "失效"}')
+            return ok
+
     def login(self) -> bool:
         """扫码登录：无登录态时截图二维码，用户手机扫码后保存登录态。
         Mock 模式：点击「模拟扫码登录」按钮。"""
-        page = self._new_page()
+        if self.check_login():
+            print('登录态有效，无需扫码', flush=True)
+            return True
+        page = self._page
         with DebugBundle(page, name='login', out_dir=self.debug_dir) as dbg:
-            page = self._enter_workbench(page, dbg)
-            if self._is_logged_in(page):
-                dbg.note('登录态有效，无需扫码')
-                return True
             if self.mock_path:
                 dbg.note('Mock 模式：点击模拟扫码登录')
                 page.locator('[data-testid="mock-scan"]').click()

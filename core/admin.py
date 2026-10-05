@@ -1,7 +1,11 @@
 """Admin 后台：demo 阶段的工作台（配规则、看会话/日志）。"""
-from django.contrib import admin
-from django.shortcuts import render
+from django.contrib import admin, messages
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import path
+from django.utils import timezone
+from django.utils.html import format_html
+
+from adapters.douyin import DouyinAdapter
 
 from .models import (
     ChatMessage,
@@ -13,6 +17,8 @@ from .models import (
     TransferRule,
 )
 from .pipeline import pipeline_for_shop
+from .sending import safety_report, send_draft, transfer_draft
+from .safety import SafetyError
 
 
 class ChatMessageInline(admin.TabularInline):
@@ -24,8 +30,9 @@ class ChatMessageInline(admin.TabularInline):
 
 @admin.register(ShopAccount)
 class ShopAccountAdmin(admin.ModelAdmin):
-    list_display = ('name', 'platform', 'is_active', 'auto_reply', 'created_at')
-    list_editable = ('is_active', 'auto_reply')
+    list_display = ('name', 'platform', 'is_active', 'auto_reply',
+                    'manual_send_enabled', 'created_at')
+    list_editable = ('is_active', 'auto_reply', 'manual_send_enabled')
 
 
 @admin.register(ChatSession)
@@ -88,10 +95,11 @@ class ReplaceRuleAdmin(admin.ModelAdmin):
 
 @admin.register(ReplyLog)
 class ReplyLogAdmin(admin.ModelAdmin):
-    list_display = ('customer', 'shop_name', 'source', 'short_incoming',
-                    'latency_ms', 'created_at')
-    list_filter = ('source', 'session__shop')
-    readonly_fields = ('session', 'incoming', 'reply', 'source', 'latency_ms', 'created_at')
+    list_display = ('customer', 'shop_name', 'source', 'status', 'short_incoming',
+                    'latency_ms', 'created_at', 'review_link')
+    list_filter = ('status', 'source', 'session__shop')
+    readonly_fields = ('session', 'incoming', 'reply', 'source', 'latency_ms', 'created_at',
+                       'status', 'reviewed_by', 'reviewed_at', 'sent_at', 'send_error')
 
     def customer(self, obj):
         return obj.session.customer_name or obj.session.customer_id
@@ -104,3 +112,49 @@ class ReplyLogAdmin(admin.ModelAdmin):
     def short_incoming(self, obj):
         return obj.incoming[:30]
     short_incoming.short_description = '客户消息（预览）'
+
+    def review_link(self, obj):
+        if obj.status != 'draft':
+            return '—'
+        return format_html('<a href="{}">审核</a>', f'{obj.id}/review/')
+    review_link.short_description = '审核'
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path('<int:pk>/review/', self.admin_site.admin_view(self.review_view),
+                 name='core_replylog_review'),
+        ]
+        return custom + urls
+
+    def review_view(self, request, pk):
+        """草稿审核页：展示风控预检 → 确认发送 / 转人工 / 驳回（二次确认）。"""
+        log = get_object_or_404(ReplyLog, pk=pk)
+        report = safety_report(log.session.shop)
+        if request.method == 'POST' and log.status == 'draft':
+            action = request.POST.get('action')
+            try:
+                if action == 'send':
+                    send_draft(log, request.user, DouyinAdapter)
+                    messages.success(request, f'草稿 #{log.id} 已发送')
+                elif action == 'transfer':
+                    transfer_draft(log, request.user, DouyinAdapter)
+                    messages.success(request, f'草稿 #{log.id} 已转人工')
+                elif action == 'reject':
+                    log.status = 'rejected'
+                    log.reviewed_by = request.user.username
+                    log.reviewed_at = timezone.now()
+                    log.save(update_fields=['status', 'reviewed_by', 'reviewed_at'])
+                    messages.success(request, f'草稿 #{log.id} 已驳回')
+                return redirect('admin:core_replylog_changelist')
+            except SafetyError as e:
+                messages.error(request, f'风控拒绝：{e}')
+            except Exception as e:
+                messages.error(request, f'执行失败：{e}')
+        context = {
+            **self.admin_site.each_context(request),
+            'title': f'审核草稿 #{log.id}',
+            'log': log,
+            'report': report,
+        }
+        return render(request, 'admin/core/draft_review.html', context)
