@@ -20,5 +20,19 @@ services:
       - csdata:/data
     restart: unless-stopped
 
+  # v0.5 消息泵常驻服务：轮询全部启用店铺，只收消息、只存草稿
+  poller:
+    build: .
+    env_file:
+      - .env
+    environment:
+      - DB_PATH=/data/db.sqlite3
+      - DOUYIN_STATE_PATH=/data/douyin_state.json
+      - DOUYIN_DEBUG_DIR=/data/debug
+    volumes:
+      - csdata:/data
+    command: python manage.py poll_douyin --interval 15
+    restart: unless-stopped
+
 volumes:
   csdata:

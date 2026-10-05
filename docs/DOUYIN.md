@@ -44,19 +44,36 @@ docker compose exec web python manage.py login_douyin
 - 扫码确认后自动保存登录态到 `douyin_state.json`，之后免扫码
 - 登录态过期（一般几周）时重跑一次本命令即可
 
-## 2. 轮询收消息（先单轮试）
+## 2. 轮询收消息（v0.5：常驻服务）
 
 ```bash
-docker compose exec web python manage.py poll_douyin --shop-id 2 --once
+docker compose up -d poller
 ```
 
-- 拉取会话列表 → 去重入库 → 走回复流水线 → **存草稿**
+- `poller` 服务常驻轮询**全部启用店铺**，间隔 15 秒，只收消息、只存草稿
 - 去 Admin → 回复日志查看生成的草稿（来源标记为 `keyword:draft` / `ai:draft` 等）
-- 单轮正常后，持续跑：
-  ```bash
-  docker compose exec web python manage.py poll_douyin --shop-id 2 --interval 10
-  ```
-  Ctrl+C 退出。
+- 单轮调试仍可用：`docker compose exec web python manage.py poll_douyin --once`
+- 看日志：`docker compose logs -f poller`
+
+## 2.5 人工审核发送（v0.5 新增）
+
+1. 在「店铺账号」里打开该店的 **「允许人工审核发送」**（默认关闭）
+2. 去「回复日志」→ 点草稿行的「审核」→ 审核页展示风控预检（开关/时段/频率/熔断）
+3. 预检全过 → 点「确认发送」（二次确认）；或「转人工」「驳回」
+4. 发送/驳回都会记录审核人、审核时间、发送时间，可审计
+
+风控默认：每店每 10 分钟最多发 20 条；服务时间 9:00–23:00（北京时间）；
+近 30 分钟发送失败 3 次自动熔断。可在 compose 环境变量调：
+`SEND_LIMIT_COUNT` / `SEND_LIMIT_MINUTES` / `SERVICE_HOURS` / `SEND_FAIL_STREAK_LIMIT`。
+
+## 2.6 登录态检查
+
+```bash
+docker compose exec web python manage.py check_douyin
+```
+
+有效则退出码 0；失效则提示重跑 `login_douyin` 扫码。引导卡片 04 会显示
+poller 心跳（最后轮询时间 / 异常）。
 
 ## 3. 出问题时：发诊断包
 
