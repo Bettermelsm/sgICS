@@ -100,3 +100,21 @@ class HeartbeatCardTests(TestCase):
             consecutive_failures=2)
         cards = workbench_guide(RequestFactory().get('/admin/'))['guide_cards']
         self.assertIn('轮询异常', cards[3]['status'])
+
+
+class ReplyLogAdminPermissionTests(TestCase):
+    def setUp(self):
+        User.objects.create_superuser('boss', 'b@x.com', 'pw')
+        self.client = Client()
+        self.client.force_login(User.objects.get(username='boss'))
+
+    def test_add_is_forbidden(self):
+        # 回复日志只能由消息泵生成：新增页 GET/POST 都应 403
+        url = reverse('admin:core_replylog_add')
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.assertEqual(self.client.post(url, {}).status_code, 403)
+
+    def test_changelist_has_no_add_button(self):
+        r = self.client.get(reverse('admin:core_replylog_changelist'))
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, '增加回复日志')

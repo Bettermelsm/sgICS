@@ -101,6 +101,14 @@ class ReplyLogAdmin(admin.ModelAdmin):
     readonly_fields = ('session', 'incoming', 'reply', 'source', 'latency_ms', 'created_at',
                        'status', 'reviewed_by', 'reviewed_at', 'sent_at', 'send_error')
 
+    def has_add_permission(self, request):
+        # 回复日志只能由消息泵生成，不可手工新增（审计完整性）
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        # 审计日志不可在后台删除
+        return False
+
     def customer(self, obj):
         return obj.session.customer_name or obj.session.customer_id
     customer.short_description = '客户'
