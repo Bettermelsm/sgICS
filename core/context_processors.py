@@ -24,7 +24,7 @@ def workbench_guide(request):
     state_path = Path(os.environ.get('DOUYIN_STATE_PATH', 'douyin_state.json'))
     state_ok = state_path.exists()
     today_drafts = ReplyLog.objects.filter(
-        created_at__date=timezone.now().date()).count()
+        created_at__date=timezone.localdate()).count()
     # v0.5：poller 心跳
     hb = PollerHeartbeat.objects.order_by('-updated_at').first()
     if hb and hb.last_run_at:

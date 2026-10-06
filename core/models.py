@@ -58,6 +58,8 @@ class ChatMessage(models.Model):
     session = models.ForeignKey(ChatSession, verbose_name='会话', on_delete=models.CASCADE, related_name='messages')
     direction = models.CharField('方向', max_length=10, choices=DIRECTION_CHOICES)
     content = models.TextField('内容')
+    # v0.8：图片消息（客服话术配图 / 客户发来的图暂只记录占位）
+    image = models.ImageField('图片', upload_to='msg/%Y/%m/', null=True, blank=True)
     source = models.CharField('回复来源', max_length=20, blank=True, default='',
                               help_text='keyword / ai / default / human / transfer')
     # 平台原生消息 ID（适配器导入时填写），用于消息去重；NULL 允许多条（如 demo 数据）
@@ -128,6 +130,8 @@ class ReplyLog(models.Model):
     session = models.ForeignKey(ChatSession, verbose_name='会话', on_delete=models.CASCADE)
     incoming = models.TextField('客户消息')
     reply = models.TextField('系统回复')
+    # v0.8：草稿可附图片，审核通过后随文字一起发出
+    image = models.ImageField('配图', upload_to='draft/%Y/%m/', null=True, blank=True)
     source = models.CharField('决策来源', max_length=20, help_text='transfer / keyword / ai / default')
     latency_ms = models.IntegerField('耗时毫秒', default=0)
     created_at = models.DateTimeField('时间', auto_now_add=True)

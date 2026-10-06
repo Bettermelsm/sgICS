@@ -61,6 +61,9 @@ SELECTORS = {
     'send_button': ['[data-testid="send-button"]', 'button[class*="send"]'],
     'transfer_button': ['[data-testid="transfer-button"]',
                         'button[class*="transfer"]', '[class*="转人工"]'],
+    # 图片发送（v0.8）
+    'image_input': ['[data-testid="image-input"]', 'input[type="file"]'],
+    'send_image_button': ['[data-testid="image-send-button"]'],
     # 动作记录（Mock 页供断言用）
     'send_log': ['[data-testid="send-log"]'],
 }
@@ -268,6 +271,22 @@ class DouyinAdapter(BaseAdapter):
                 page.keyboard.press('Enter')  # 兜底：回车发送
             page.wait_for_timeout(1500)
             dbg.note('发送动作已执行')
+            return True
+
+    def send_image(self, session_key: str, image_path: str) -> bool:
+        """向指定会话发送图片。v0.8 新增，Mock 页验证通过。"""
+        if self._page is None:
+            self.login()
+        page = self._page
+        with DebugBundle(page, name='send_image', out_dir=self.debug_dir) as dbg:
+            dbg.note(f'发送图片到会话 {session_key}：{image_path}')
+            self._open_session(page, session_key, dbg)
+            file_input = self._first_hit(page, SELECTORS['image_input'], '图片上传框')
+            file_input.set_input_files(image_path)
+            btn = self._first_hit(page, SELECTORS['send_image_button'], '图片发送按钮')
+            btn.click()
+            page.wait_for_timeout(1500)
+            dbg.note('图片发送动作已执行')
             return True
 
     def transfer_to_human(self, session_key: str) -> bool:

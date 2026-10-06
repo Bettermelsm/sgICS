@@ -79,6 +79,23 @@ class MockBrowserTests(TestCase):
         finally:
             adapter.close()
 
+    def test_send_image(self):
+        import tempfile
+        png = (b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01'
+               b'\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89'
+               b'\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01'
+               b'\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82')
+        img = str(Path(tempfile.mkdtemp()) / 'size-chart.png')
+        Path(img).write_bytes(png)
+        adapter = self._adapter()
+        try:
+            adapter.login()
+            self.assertTrue(adapter.send_image('客户A', img))
+            log = adapter._page.locator('[data-testid="send-log"]').inner_text()
+            self.assertIn('SENT_IMAGE:size-chart.png', log)
+        finally:
+            adapter.close()
+
     def test_message_ids_stable(self):
         # Playwright 同一线程只允许一个 sync 实例：串行验证跨进程 ID 稳定性
         a1 = self._adapter()

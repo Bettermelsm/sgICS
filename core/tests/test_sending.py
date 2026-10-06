@@ -27,6 +27,12 @@ class FakeAdapter:
         self.sent.append((session_key, content))
         return True
 
+    def send_image(self, session_key, image_path):
+        if self.fail:
+            raise RuntimeError('boom')
+        self.sent.append((session_key, 'IMAGE:' + str(image_path)))
+        return True
+
     def transfer_to_human(self, session_key):
         self.transferred.append(session_key)
         return True
@@ -86,6 +92,20 @@ class SendingTests(TestCase):
         log.refresh_from_db()
         self.assertEqual(log.status, 'failed')
         self.assertIn('boom', log.send_error)
+
+    def test_send_draft_with_image(self):
+        import tempfile
+        from django.core.files.base import ContentFile
+        log = self._draft()
+        log.image.save('t.png', ContentFile(b'fakepng'), save=True)
+        fake = FakeAdapter()
+        with mock.patch('core.safety.in_service_hours', return_value=True):
+            self.assertTrue(send_draft(log, self.user, lambda: fake))
+        log.refresh_from_db()
+        self.assertEqual(log.status, 'sent')
+        kinds = [c for _, c in fake.sent]
+        self.assertEqual(kinds[0], '48小时内发出')
+        self.assertTrue(kinds[1].startswith('IMAGE:'))
 
     def test_transfer(self):
         log = self._draft(source='transfer:draft')
