@@ -1,4 +1,6 @@
-# 智能客服 Demo（Django 版）
+# sgICS（智能客服系统，Intelligent Customer Service）
+
+> GitHub：https://github.com/Bettermelsm/sgICS
 
 Django 自研路线第一步：**大脑先跑通**。本 demo 实现原 ChatGPT-On-CS 的
 回复流水线（转人工 → 关键词 → AI兜底 → 默认回复 → 出站替换），
@@ -41,7 +43,7 @@ docker compose up --build
 
 ## 一、Win11 环境准备（零基础按顺序做）
 
-0. 先把本项目文件夹放到电脑上（例如解压到 `D:\cs-demo`）
+0. 先把本项目文件夹放到电脑上（例如解压到 `D:\sgICS`）
 1. 安装 Python 3.11+：
    - 打开 https://www.python.org/downloads/ ，点黄色的 "Download Python 3.x" 按钮下载 64 位安装包
    - 运行安装包，**第一屏务必勾选 "Add python.exe to PATH"**，再点 Install Now
