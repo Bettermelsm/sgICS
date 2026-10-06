@@ -1,0 +1,52 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>知识库测试</h1>
+<p style="color:#666">输入一个问题，查看检索到的资料块和 AI 回答。只测试，不入库。</p>
+<form method="post">
+  {% csrf_token %}
+  <p>
+    <label>店铺：
+      <select name="shop">
+        {% for s in shops %}
+        <option value="{{ s.id }}"{% if shop and s.id == shop.id %} selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </p>
+  <p>
+    <label>问题：<br>
+      <textarea name="q" rows="3" cols="70">{{ question }}</textarea>
+    </label>
+  </p>
+  <p><button type="submit" class="default">测试</button></p>
+</form>
+
+{% if question %}
+<hr>
+{% if error %}
+<p style="color:#a00">出错：{{ error }}</p>
+{% else %}
+<h2>AI 回答 <span style="font-size:12px;color:#888">（{{ ms }} ms）</span></h2>
+<blockquote style="background:#f7f9fb;padding:8px 12px;border-radius:4px">{{ answer }}</blockquote>
+<h2>检索到的资料（{{ hits|length }} 段）</h2>
+{% if hits %}
+<table style="border-collapse:collapse;width:100%">
+  <tr><th style="text-align:left;padding:6px">文档</th>
+      <th style="text-align:left;padding:6px">相似度</th>
+      <th style="text-align:left;padding:6px">内容</th></tr>
+  {% for chunk, score in hits %}
+  <tr style="border-top:1px solid #eee">
+    <td style="padding:6px">{{ chunk.doc.title }}</td>
+    <td style="padding:6px">{{ score|floatformat:3 }}</td>
+    <td style="padding:6px;color:#555">{{ chunk.content|truncatechars:120 }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p style="color:#a00">没有检索到相关资料（知识库为空或相似度过低），AI 为纯兜底回答。</p>
+{% endif %}
+<p><a href="../">← 返回知识库文档</a></p>
+{% endif %}
+{% endif %}
+{% endblock %}

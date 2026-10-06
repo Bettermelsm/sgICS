@@ -160,3 +160,50 @@ class PollerHeartbeat(models.Model):
 
     def __str__(self):
         return f'{self.shop.name} 心跳'
+
+
+class KnowledgeDoc(models.Model):
+    """知识库文档：上传后解析切分入库，供 AI 兜底检索引用。"""
+
+    STATUS_CHOICES = [
+        ('pending', '待入库'),
+        ('indexing', '入库中'),
+        ('ready', '已就绪'),
+        ('failed', '失败'),
+    ]
+
+    shop = models.ForeignKey(ShopAccount, verbose_name='店铺', on_delete=models.CASCADE)
+    title = models.CharField('标题', max_length=200)
+    file = models.FileField('文件', upload_to='kb/%Y/%m/')
+    doc_type = models.CharField('类型', max_length=10, blank=True,
+                                help_text='txt / md / pdf / docx / xlsx')
+    status = models.CharField('状态', max_length=20, choices=STATUS_CHOICES, default='pending')
+    chunk_count = models.IntegerField('分块数', default=0)
+    error = models.TextField('错误', blank=True, default='')
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+
+    class Meta:
+        verbose_name = '知识库文档'
+        verbose_name_plural = '知识库文档'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.title}（{self.get_status_display()}）'
+
+
+class KnowledgeChunk(models.Model):
+    """文档分块：一条一向量，检索的基本单位。"""
+
+    doc = models.ForeignKey(KnowledgeDoc, verbose_name='文档', on_delete=models.CASCADE,
+                            related_name='chunks')
+    ordering = models.IntegerField('序号', default=0)
+    content = models.TextField('内容')
+    embedding = models.TextField('向量JSON', blank=True, default='')
+
+    class Meta:
+        verbose_name = '知识分块'
+        verbose_name_plural = '知识分块'
+        ordering = ['ordering']
+
+    def __str__(self):
+        return f'{self.doc.title}#{self.ordering}'

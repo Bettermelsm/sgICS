@@ -12,6 +12,8 @@ services:
       # 飞鸽登录态 / 诊断包同样落到挂载卷
       - DOUYIN_STATE_PATH=/data/douyin_state.json
       - DOUYIN_DEBUG_DIR=/data/debug
+      # 知识库上传文件落到挂载卷
+      - MEDIA_PATH=/data/media
       # demo 管理员账号（首次启动自动创建）
       - DJANGO_SUPERUSER_USERNAME=admin
       - DJANGO_SUPERUSER_PASSWORD=admin123
@@ -29,6 +31,7 @@ services:
       - DB_PATH=/data/db.sqlite3
       - DOUYIN_STATE_PATH=/data/douyin_state.json
       - DOUYIN_DEBUG_DIR=/data/debug
+      - MEDIA_PATH=/data/media
     volumes:
       - csdata:/data
     command: python manage.py poll_douyin --interval 15

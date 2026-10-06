@@ -1,4 +1,6 @@
 """Admin 后台：demo 阶段的工作台（配规则、看会话/日志）。"""
+import time
+
 from django.contrib import admin, messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import path
@@ -7,10 +9,13 @@ from django.utils.html import format_html
 
 from adapters.douyin import DouyinAdapter
 
+from .kb import guess_doc_type, ingest_doc
 from .models import (
     ChatMessage,
     ChatSession,
     KeywordRule,
+    KnowledgeChunk,
+    KnowledgeDoc,
     ReplyLog,
     ReplaceRule,
     ShopAccount,
@@ -166,3 +171,76 @@ class ReplyLogAdmin(admin.ModelAdmin):
             'report': report,
         }
         return render(request, 'admin/core/draft_review.html', context)
+
+
+@admin.register(KnowledgeDoc)
+class KnowledgeDocAdmin(admin.ModelAdmin):
+    list_display = ('title', 'shop', 'doc_type', 'status', 'chunk_count', 'created_at')
+    list_filter = ('shop', 'status')
+    readonly_fields = ('status', 'chunk_count', 'error', 'created_at')
+    change_list_template = 'admin/core/knowledgedoc/change_list.html'
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path('test/', self.admin_site.admin_view(self.test_view),
+                 name='core_knowledgedoc_test'),
+        ]
+        return custom + urls
+
+    def save_model(self, request, obj, form, change):
+        if obj.file and not obj.doc_type:
+            obj.doc_type = guess_doc_type(obj.file.name)
+        super().save_model(request, obj, form, change)
+        if not change:
+            # 新增文档自动入库（demo 量级同步执行即可）
+            try:
+                n = ingest_doc(obj)
+                self.message_user(request, f'入库成功：{n} 个分块')
+            except Exception as e:
+                self.message_user(request, f'入库失败：{e}', level=messages.ERROR)
+
+    def test_view(self, request):
+        """知识库测试：输入问题，显示检索到的资料块 + AI 回答（不入库）。"""
+        shops = ShopAccount.objects.filter(is_active=True)
+        shop_id = request.POST.get('shop') or request.GET.get('shop')
+        shop = shops.filter(id=shop_id).first() or shops.first()
+        question = request.POST.get('q', '').strip() if request.method == 'POST' else ''
+        hits, answer, ms, error = [], '', 0, ''
+        if request.method == 'POST' and shop and question:
+            start = time.time()
+            try:
+                pipeline = pipeline_for_shop(shop, use_kb=True)
+                answer, hits = pipeline.ask_with_kb(question)
+            except Exception as e:
+                error = str(e)
+            ms = int((time.time() - start) * 1000)
+        context = {
+            **self.admin_site.each_context(request),
+            'title': '知识库测试',
+            'shops': shops,
+            'shop': shop,
+            'question': question,
+            'hits': hits,
+            'answer': answer,
+            'ms': ms,
+            'error': error,
+        }
+        return render(request, 'admin/core/kb_test.html', context)
+
+
+@admin.register(KnowledgeChunk)
+class KnowledgeChunkAdmin(admin.ModelAdmin):
+    list_display = ('doc', 'ordering', 'short_content')
+    list_filter = ('doc__shop', 'doc')
+    readonly_fields = ('doc', 'ordering', 'content')
+
+    def short_content(self, obj):
+        return obj.content[:60]
+    short_content.short_description = '内容预览'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

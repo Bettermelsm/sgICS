@@ -40,7 +40,7 @@ class ReplyPipeline:
     def __init__(self, llm: BaseLLMGateway, rules: RuleSet,
                  default_reply: str = '', ai_fail_threshold: int = 3,
                  context_rounds: int = 5, auto_reply: bool = False,
-                 shop_name: str = ''):
+                 shop_name: str = '', retriever=None):
         self.llm = llm
         self.rules = rules
         self.default_reply = default_reply or getattr(settings, 'CS_DEFAULT_REPLY', '')
@@ -49,6 +49,15 @@ class ReplyPipeline:
         self.context_rounds = context_rounds or getattr(settings, 'CS_CONTEXT_ROUNDS', 5)
         self.auto_reply = auto_reply
         self.shop_name = shop_name
+        self.retriever = retriever  # 知识库检索器（v0.7），无则纯 AI 兜底
+
+    def ask_with_kb(self, text: str, history: list = None) -> tuple:
+        """知识库问答：检索→拼上下文→LLM 作答。返回 (reply, hits)。"""
+        hits = self.retriever.search(text, top_k=3) if self.retriever else []
+        kb_context = '\n\n'.join(
+            f'【资料{i + 1}】{c.content}' for i, (c, _s) in enumerate(hits))
+        messages = self._build_messages(text, history or [], kb_context)
+        return self.llm.chat(messages), hits
 
     def handle(self, text: str, history: list, session_state: dict) -> PipelineResult:
         """history: [{'role': 'user'|'assistant', 'content': str}] 最近 N 轮。
@@ -86,15 +95,15 @@ class ReplyPipeline:
                 result.latency_ms = self._ms(start)
                 return result
 
-        # 4. AI 兜底
+        # 4. AI 兜底（先检索知识库）
         try:
-            messages = self._build_messages(text, history)
-            ai_reply = self.llm.chat(messages)
+            ai_reply, hits = self.ask_with_kb(text, history)
             if ai_reply and ai_reply.strip():
                 session_state['ai_fail_count'] = 0
                 result.source = 'ai'
                 result.reply = self._apply_replace(ai_reply.strip())
-                result.detail = f'AI 兜底（{self.llm.name}）'
+                result.detail = f'AI 兜底（{self.llm.name}）' + (
+                    f'，引用 {len(hits)} 段资料' if hits else '')
                 result.should_send = self.auto_reply
                 result.latency_ms = self._ms(start)
                 return result
@@ -120,11 +129,13 @@ class ReplyPipeline:
         result.latency_ms = self._ms(start)
         return result
 
-    def _build_messages(self, text: str, history: list) -> list:
+    def _build_messages(self, text: str, history: list, kb_context: str = '') -> list:
         system = (
             f'你是「{self.shop_name or "本店"}」的智能客服助手。用简洁、亲切的中文回复客户咨询，'
             '一次只回答当前问题，不要编造订单、价格、库存等事实信息，不确定的请引导客户提供订单号或转人工。'
         )
+        if kb_context:
+            system += f'\n\n以下是与客户问题相关的内部资料，优先依据它们回答：\n{kb_context}'
         messages = [{'role': 'system', 'content': system}]
         messages.extend(history[-self.context_rounds * 2:])
         messages.append({'role': 'user', 'content': text})
@@ -154,8 +165,19 @@ def ruleset_for_shop(shop) -> RuleSet:
     )
 
 
-def pipeline_for_shop(shop, llm=None, auto_reply: bool = False) -> ReplyPipeline:
-    """为某店铺装配好流水线（规则来自 DB，LLM 默认按环境自动选择）。"""
+def pipeline_for_shop(shop, llm=None, auto_reply: bool = False,
+                      use_kb: bool = True, embed_fn=None) -> ReplyPipeline:
+    """为某店铺装配好流水线（规则来自 DB，LLM 默认按环境自动选择）。
+
+    use_kb=True 且该店有已就绪的知识库文档时，自动接上检索器；
+    embed_fn 仅测试用（注入 fake embedding）。
+    """
+    from .kb import Retriever
     from .llm_gateway import build_gateway
+    from .models import KnowledgeDoc
+    retriever = None
+    if use_kb and KnowledgeDoc.objects.filter(shop=shop, status='ready').exists():
+        retriever = Retriever(shop, embed_fn=embed_fn)
     return ReplyPipeline(llm=llm or build_gateway(), rules=ruleset_for_shop(shop),
-                         auto_reply=auto_reply, shop_name=shop.name)
+                         auto_reply=auto_reply, shop_name=shop.name,
+                         retriever=retriever)
