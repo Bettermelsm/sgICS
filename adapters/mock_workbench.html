@@ -84,6 +84,10 @@
           <button data-testid="send-button">发送</button>
           <button data-testid="transfer-button">转人工</button>
         </div>
+        <div style="margin-top:8px">
+          <input type="file" data-testid="image-input" accept="image/*">
+          <button data-testid="image-send-button">发送图片</button>
+        </div>
       </div>
       <!-- 动作记录：供自动化断言 -->
       <div id="send-log" data-testid="send-log"></div>
@@ -126,6 +130,12 @@ document.querySelector('[data-testid="send-button"]').addEventListener('click', 
 // 转人工：记录到 send-log
 document.querySelector('[data-testid="transfer-button"]').addEventListener('click', () => {
   document.querySelector('[data-testid="send-log"]').textContent += 'TRANSFER\n';
+});
+// 发送图片：记录文件名到 send-log
+document.querySelector('[data-testid="image-send-button"]').addEventListener('click', () => {
+  const fi = document.querySelector('[data-testid="image-input"]');
+  const name = (fi.files && fi.files[0] && fi.files[0].name) || 'nofile';
+  document.querySelector('[data-testid="send-log"]').textContent += 'SENT_IMAGE:' + name + '\n';
 });
 </script>
 </body>

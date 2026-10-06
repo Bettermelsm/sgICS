@@ -37,6 +37,7 @@ docker compose up --build
 - 演示占位页：http://localhost:8000/coming-soon/ —— 未开放的功能统一跳这里
   （视图里 `return coming_soon_redirect(request)`），避免演示时出现 404
 - 跑单测：`docker compose exec web python manage.py test`
+- 数据库备份：`docker compose exec web python manage.py backup_db`
 - 数据持久化在 Docker 卷 `csdata` 中，重建容器不丢
 
 下面是**不装 Docker、直接用 Python** 的方式（二选一即可）。
@@ -115,10 +116,13 @@ docker compose exec web python manage.py poll_douyin --shop-id 2   # 持续轮�
 **铁律**：v0.3 全程草稿模式，只收消息、只存草稿，不发送。
 真实发送与转人工验证留到 v0.4。
 
-## 六、后续演进方向
+## 六、后续演进方向（需客户输入）
 
-- 实时推送：Django Channels（WebSocket）把新消息推到工作台
-- 后台任务：Celery + Redis 做消息轮询、发送重试、DLQ
-- 工作台前端：admin 先顶 demo，正式版做独立前端页面
+- 真实店铺联调：选择器校准（diagnostic bundle 流程，见 docs/DOUYIN.md）
+- 话术包灌入：关键词 / 转人工规则（等客户话术）
+- 产品资料灌入：知识库文档批量导入（等客户资料）
+- 图片素材库：尺码表 / 安装说明等配图（等客户图片）
 - 更多平台：按 `adapters/base.py` 契约新增拼多多/千牛适配器
-- 知识库 RAG：商品/售后文档向量检索，接到 AI 兜底之前
+
+已完成的不再列：草稿审核发送、风控、poller 常驻、知识库 RAG、图片消息、数据看板
+（见 CHANGELOG）。

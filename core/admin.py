@@ -29,8 +29,14 @@ from .safety import SafetyError
 class ChatMessageInline(admin.TabularInline):
     model = ChatMessage
     extra = 0
-    readonly_fields = ('direction', 'content', 'source', 'created_at')
+    readonly_fields = ('direction', 'content', 'image_thumb', 'source', 'created_at')
     can_delete = False
+
+    def image_thumb(self, obj):
+        if obj.image:
+            return format_html('<img src="{}" style="max-height:60px">', obj.image.url)
+        return '—'
+    image_thumb.short_description = '图片'
 
 
 @admin.register(ShopAccount)
@@ -103,7 +109,8 @@ class ReplyLogAdmin(admin.ModelAdmin):
     list_display = ('customer', 'shop_name', 'source', 'status', 'short_incoming',
                     'latency_ms', 'created_at', 'review_link')
     list_filter = ('status', 'source', 'session__shop')
-    readonly_fields = ('session', 'incoming', 'reply', 'source', 'latency_ms', 'created_at',
+    change_list_template = 'admin/core/replylog/change_list.html'
+    readonly_fields = ('session', 'incoming', 'reply', 'image', 'source', 'latency_ms', 'created_at',
                        'status', 'reviewed_by', 'reviewed_at', 'sent_at', 'send_error')
 
     def has_add_permission(self, request):
@@ -135,10 +142,21 @@ class ReplyLogAdmin(admin.ModelAdmin):
     def get_urls(self):
         urls = super().get_urls()
         custom = [
+            path('stats/', self.admin_site.admin_view(self.stats_view),
+                 name='core_replylog_stats'),
             path('<int:pk>/review/', self.admin_site.admin_view(self.review_view),
                  name='core_replylog_review'),
         ]
         return custom + urls
+
+    def stats_view(self, request):
+        """数据看板：近 7 天消息量 / 来源分布 / 转人工率 / 耗时 / 待审草稿。"""
+        context = {
+            **self.admin_site.each_context(request),
+            'title': '数据看板',
+            **_stats_data(),
+        }
+        return render(request, 'admin/core/stats.html', context)
 
     def review_view(self, request, pk):
         """草稿审核页：展示风控预检 → 确认发送 / 转人工 / 驳回（二次确认）。"""
@@ -147,7 +165,11 @@ class ReplyLogAdmin(admin.ModelAdmin):
         if request.method == 'POST' and log.status == 'draft':
             action = request.POST.get('action')
             try:
-                if action == 'send':
+                if action == 'upload_image' and request.FILES.get('image'):
+                    log.image = request.FILES['image']
+                    log.save(update_fields=['image'])
+                    messages.success(request, '配图已上传')
+                elif action == 'send':
                     send_draft(log, request.user, DouyinAdapter)
                     messages.success(request, f'草稿 #{log.id} 已发送')
                 elif action == 'transfer':
@@ -159,7 +181,7 @@ class ReplyLogAdmin(admin.ModelAdmin):
                     log.reviewed_at = timezone.now()
                     log.save(update_fields=['status', 'reviewed_by', 'reviewed_at'])
                     messages.success(request, f'草稿 #{log.id} 已驳回')
-                return redirect('admin:core_replylog_changelist')
+                return redirect('admin:core_replylog_review', pk=log.id)
             except SafetyError as e:
                 messages.error(request, f'风控拒绝：{e}')
             except Exception as e:
@@ -179,6 +201,20 @@ class KnowledgeDocAdmin(admin.ModelAdmin):
     list_filter = ('shop', 'status')
     readonly_fields = ('status', 'chunk_count', 'error', 'created_at')
     change_list_template = 'admin/core/knowledgedoc/change_list.html'
+    actions = ['reingest_docs']
+
+    def reingest_docs(self, request, queryset):
+        ok = 0
+        for doc in queryset:
+            try:
+                ingest_doc(doc)
+                ok += 1
+            except Exception as e:
+                self.message_user(request, f'{doc.title} 入库失败：{e}',
+                                  level=messages.ERROR)
+        if ok:
+            self.message_user(request, f'{ok} 个文档重新入库完成')
+    reingest_docs.short_description = '重新入库选中文档'
 
     def get_urls(self):
         urls = super().get_urls()
@@ -244,3 +280,39 @@ class KnowledgeChunkAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+def _stats_data():
+    """数据看板聚合（近 7 天）。"""
+    from django.db.models import Avg, Count
+    from django.db.models.functions import TruncDate
+    today = timezone.localdate()  # 注意：用本地日期，与 TruncDate(TIME_ZONE) 对齐
+    days = [today - timezone.timedelta(days=i) for i in range(6, -1, -1)]
+    per_day = {d: 0 for d in days}
+    for row in (ChatMessage.objects
+                .filter(direction='in', created_at__date__gte=days[0])
+                .annotate(d=TruncDate('created_at'))
+                .values('d').annotate(n=Count('id'))):
+        if row['d'] in per_day:
+            per_day[row['d']] = row['n']
+    sources = {}
+    for row in (ReplyLog.objects
+                .filter(created_at__date__gte=days[0])
+                .values('source').annotate(n=Count('id'))):
+        base = row['source'].split(':')[0]
+        sources[base] = sources.get(base, 0) + row['n']
+    total_sessions = ChatSession.objects.count()
+    transferred = ChatSession.objects.filter(is_transferred=True).count()
+    avg_latency = ReplyLog.objects.filter(
+        created_at__date__gte=days[0]).aggregate(a=Avg('latency_ms'))['a'] or 0
+    pending = ReplyLog.objects.filter(status='draft').count()
+    return {
+        'days': [{'date': d.strftime('%m-%d'), 'n': per_day[d]} for d in days],
+        'max_day': max(per_day.values()) or 1,
+        'sources': sources,
+        'total_msgs': sum(per_day.values()),
+        'transfer_rate': round(transferred / total_sessions * 100, 1) if total_sessions else 0,
+        'avg_latency': round(avg_latency),
+        'pending': pending,
+        'source_labels': {'transfer': '转人工', 'keyword': '关键词', 'ai': 'AI 兜底', 'default': '默认回复'},
+    }
