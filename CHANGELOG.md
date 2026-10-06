@@ -2,6 +2,24 @@
 
 格式：`## [版本号] - 日期`，下挂 Added / Changed / Fixed。
 
+## [v0.7.1] - 2026-10-07
+### Fixed
+- 补上 v0.7.0 遗漏的版本号与 CHANGELOG 条目（发布时分支分叉，sed 匹配 0.6.0 未命中导致静默失败；
+  功能代码本身已在 v0.7.0 中）。发版前新增版本号校验，杜绝再犯。
+
+## [v0.7.0] - 2026-10-06
+### Added
+- 知识库 RAG 基建：`KnowledgeDoc` / `KnowledgeChunk` 模型；Admin 上传文档
+  （txt/md/pdf/docx/xlsx）自动解析切分入库；删除文档级联删分块
+- `core/kb.py`：切分（500 字/50 字重叠，超长段硬切）、智谱 embedding 接口
+  （ZHIPU_EMBED_MODEL，默认 embedding-2）、余弦检索（DB 存向量，demo 量级暴力检索）
+- AI 兜底自动注入检索上下文：`ReplyPipeline.ask_with_kb()`，命中时 detail 标注"引用 N 段资料"；
+  无知识库/无命中时行为与之前一致
+- 知识库测试器：Admin → 知识库文档 →「知识库测试」，输入问题看检索资料块 + AI 回答
+- 上传文件持久化：MEDIA_PATH=/data/media（compose 已配）
+### Changed
+- requirements 新增 pypdf / python-docx / openpyxl
+
 ## [v0.6.0] - 2026-10-06
 ### Added
 - 演示占位页 `/coming-soon/`：君君形象 + "当前功能模块尚未开放，请联系开发团队授权" +
