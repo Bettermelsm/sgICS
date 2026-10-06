@@ -2,6 +2,11 @@
 
 格式：`## [版本号] - 日期`，下挂 Added / Changed / Fixed。
 
+## [v0.8.1] - 2026-10-07
+### Fixed
+- 移除误提交的测试上传文件（media/draft/*.png）；media/ 加入 .gitignore；
+  图片上传测试改用临时目录，不再污染仓库
+
 ## [v0.8.0] - 2026-10-07
 ### Added
 - 图片消息：ChatMessage / ReplyLog 新增 image 字段；审核页可上传配图，
