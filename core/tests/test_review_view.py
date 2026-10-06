@@ -53,7 +53,7 @@ class ReviewViewTests(TestCase):
 
     def test_post_send_success(self):
         with mock.patch('core.admin.DouyinAdapter', FakeAdapter):
-            with mock.patch('core.sending.in_service_hours', return_value=True):
+            with mock.patch('core.safety.in_service_hours', return_value=True):
                 r = self.client.post(self.url, {'action': 'send'})
         self.assertEqual(r.status_code, 302)
         self.log.refresh_from_db()

@@ -68,6 +68,10 @@ USE_TZ = True
 STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# 上传文件（知识库文档等）：Docker 里通过环境变量指向 /data 卷
+MEDIA_URL = 'media/'
+MEDIA_ROOT = os.environ.get('MEDIA_PATH', BASE_DIR / 'media')
+
 # ---- 客服 demo 业务配置 ----
 CS_DEFAULT_REPLY = '您好，我是智能客服助手，您的问题已收到，稍后为您详细解答~'
 CS_AI_FAIL_TRANSFER_THRESHOLD = 3  # AI 连续兜底失败 N 次后自动转人工
