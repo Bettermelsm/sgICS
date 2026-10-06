@@ -32,6 +32,8 @@ docker compose up --build
 - 真实 GLM 多轮演示：`docker compose exec web python manage.py demo_pipeline --real --multi`
 - 适配器全流程演示（Mock 工作台，离线可跑）：
   `docker compose exec web python manage.py demo_adapter --mock`
+- 演示占位页：http://localhost:8000/coming-soon/ —— 未开放的功能统一跳这里
+  （视图里 `return coming_soon_redirect(request)`），避免演示时出现 404
 - 跑单测：`docker compose exec web python manage.py test`
 - 数据持久化在 Docker 卷 `csdata` 中，重建容器不丢
 

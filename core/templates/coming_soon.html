@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>功能尚未开放 - 智能客服系统</title>
+<style>
+  body { margin: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+         background: #f4f7fb; color: #333; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 48px 24px; text-align: center; }
+  .hero { max-width: 420px; width: 100%; border-radius: 16px;
+          box-shadow: 0 8px 32px rgba(30, 100, 200, .12); }
+  .msg { margin-top: 28px; font-size: 18px; color: #444; }
+  .back { display: inline-block; margin-top: 24px; padding: 10px 36px;
+          background: #1e64c8; color: #fff; text-decoration: none; border-radius: 8px; }
+  .back:hover { background: #1853a8; }
+  .ver { margin-top: 32px; font-size: 12px; color: #999; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <img class="hero" src="{% static 'core/img/junjun.webp' %}" alt="君君">
+    <p class="msg">当前功能模块尚未开放，请联系开发团队授权。</p>
+    <a class="back" href="/admin/">返回工作台</a>
+    <p class="ver">智能客服系统</p>
+  </div>
+</body>
+</html>
