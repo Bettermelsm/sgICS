@@ -1,4 +1,4 @@
-"""Django settings for cs-demo (智能客服 demo)."""
+"""Django settings for sgICS (智能客服 demo)."""
 import os
 from pathlib import Path
 
