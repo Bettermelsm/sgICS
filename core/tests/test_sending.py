@@ -52,7 +52,7 @@ class SendingTests(TestCase):
     def test_send_success(self):
         log = self._draft()
         fake = FakeAdapter()
-        with mock.patch('core.sending.in_service_hours', return_value=True):
+        with mock.patch('core.safety.in_service_hours', return_value=True):
             self.assertTrue(send_draft(log, self.user, lambda: fake))
         log.refresh_from_db()
         self.assertEqual(log.status, 'sent')
@@ -80,7 +80,7 @@ class SendingTests(TestCase):
     def test_send_failure_recorded(self):
         log = self._draft()
         fake = FakeAdapter(fail=True)
-        with mock.patch('core.sending.in_service_hours', return_value=True):
+        with mock.patch('core.safety.in_service_hours', return_value=True):
             with self.assertRaises(RuntimeError):
                 send_draft(log, self.user, lambda: fake)
         log.refresh_from_db()
