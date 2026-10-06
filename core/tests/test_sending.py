@@ -1,8 +1,9 @@
 """人工审核发送测试（fake 适配器，不启动浏览器）。"""
+import tempfile
 from unittest import mock
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from core.models import ChatSession, ReplyLog, ShopAccount
 from core.safety import SafetyError
@@ -93,8 +94,8 @@ class SendingTests(TestCase):
         self.assertEqual(log.status, 'failed')
         self.assertIn('boom', log.send_error)
 
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
     def test_send_draft_with_image(self):
-        import tempfile
         from django.core.files.base import ContentFile
         log = self._draft()
         log.image.save('t.png', ContentFile(b'fakepng'), save=True)
