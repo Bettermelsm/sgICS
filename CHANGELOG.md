@@ -2,6 +2,18 @@
 
 格式：`## [版本号] - 日期`，下挂 Added / Changed / Fixed。
 
+## [v0.8.0] - 2026-10-07
+### Added
+- 图片消息：ChatMessage / ReplyLog 新增 image 字段；审核页可上传配图，
+  确认发送时文字+图片一起发出；适配器 `send_image()`（Mock 页真实验证）
+- 数据看板：回复日志 →「数据看板」，近 7 天消息量 / 来源分布 / 转人工率 /
+  平均耗时 / 待审草稿（纯 CSS 条形图，无外部依赖）
+- 知识库「重新入库」admin 动作；`backup_db` 数据库热备命令（sqlite3 backup API）
+- 操作手册 docs/OPERATOR.md（客服日常 SOP：开工检查/审稿发送/配话术/知识库/FAQ/安全红线）
+- ARCHITECTURE.md 补版本演进与 v0.5+ 新增架构图；README 演进方向刷新为"待客户输入"清单
+### Fixed
+- 看板与引导卡片的"今日"统计改用 `timezone.localdate()`，修复跨午夜时区偏差
+
 ## [v0.7.2] - 2026-10-07
 ### Changed
 - 品牌：Admin 左上角 "Django 管理" 改为 sgICS；"查看站点" 指向工作台首页（原来是 404）

@@ -34,7 +34,7 @@ def _mark(log, user, **fields):
 
 
 def send_draft(log, user, adapter_factory) -> bool:
-    """批准发送一条草稿。成功→sent；失败→failed 并记错。风控不通过抛 SafetyError。"""
+    """批准发送一条草稿（含配图）。成功→sent；失败→failed 并记错。风控不通过抛 SafetyError。"""
     shop = log.session.shop
     if log.status != 'draft':
         raise SafetyError(f'该草稿状态为"{log.get_status_display()}"，不能重复处理')
@@ -43,6 +43,8 @@ def send_draft(log, user, adapter_factory) -> bool:
     try:
         adapter.login()
         ok = adapter.send_message(log.session.customer_id, log.reply)
+        if ok and log.image:
+            ok = adapter.send_image(log.session.customer_id, log.image.path)
         if ok:
             _mark(log, user, status='sent', sent_at=timezone.now())
         else:
