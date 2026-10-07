@@ -2,6 +2,11 @@
 
 格式：`## [版本号] - 日期`，下挂 Added / Changed / Fixed。
 
+## [v0.8.2] - 2026-10-07
+### Fixed
+- .env.example 补全 v0.5–v0.8 新增的全部环境变量（embedding 模型、文件路径、风控阈值、
+  管理员账号），客户 clone 后照着配就能跑
+
 ## [v0.8.1] - 2026-10-07
 ### Fixed
 - 移除误提交的测试上传文件（media/draft/*.png）；media/ 加入 .gitignore；
