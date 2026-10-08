@@ -12,7 +12,7 @@ from core.models import ChatSession, PollerHeartbeat, ReplyLog, ShopAccount
 class FakeAdapter:
     last = None
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         FakeAdapter.last = self
         self.sent = []
 

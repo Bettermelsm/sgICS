@@ -1,0 +1,48 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>{{ job.get_method_display }} - {{ shop.name }}</h1>
+
+<div id="box" style="margin:16px 0">
+  <p id="status">启动中…</p>
+  <div id="qr-wrap" style="display:none;margin:12px 0">
+    <p>请用手机抖音 App 扫描下方二维码：</p>
+    <img id="qr" src="" alt="登录二维码" style="max-width:320px;border:1px solid #ddd;border-radius:8px">
+    <p style="color:#888;font-size:12px">二维码约 3 分钟有效，过期请返回重新发起</p>
+  </div>
+  <p id="error" style="color:#a00"></p>
+  <p><a id="back" href="{{ manage_url }}" style="display:none">← 返回登录管理</a></p>
+</div>
+
+<script>
+(function() {
+  var url = "{{ status_url }}";
+  function poll() {
+    fetch(url).then(function(r) { return r.json(); }).then(function(d) {
+      var st = document.getElementById('status');
+      var back = document.getElementById('back');
+      if (d.status === 'waiting_qr' || d.status === 'running') {
+        st.textContent = d.status === 'waiting_qr' ? '等待扫码…' :
+          (d.method === 'password' ? '正在账号登录…' :
+           d.method === 'check' ? '正在检测…' : '正在打开登录页…');
+        if (d.qr_url) {
+          var w = document.getElementById('qr-wrap');
+          w.style.display = 'block';
+          var img = document.getElementById('qr');
+          if (img.getAttribute('src') !== d.qr_url) img.setAttribute('src', d.qr_url);
+        }
+        setTimeout(poll, 3000);
+      } else if (d.status === 'success') {
+        st.innerHTML = '<strong style="color:green">● 成功</strong>';
+        back.style.display = 'inline';
+      } else {
+        st.innerHTML = '<strong style="color:#a00">● 失败</strong>';
+        document.getElementById('error').textContent = d.error || '未知错误';
+        back.style.display = 'inline';
+      }
+    }).catch(function() { setTimeout(poll, 5000); });
+  }
+  poll();
+})();
+</script>
+{% endblock %}

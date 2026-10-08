@@ -69,7 +69,7 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # 上传文件（知识库文档等）：Docker 里通过环境变量指向 /data 卷
-MEDIA_URL = 'media/'
+MEDIA_URL = '/media/'
 MEDIA_ROOT = os.environ.get('MEDIA_PATH', BASE_DIR / 'media')
 
 # ---- 客服 demo 业务配置 ----

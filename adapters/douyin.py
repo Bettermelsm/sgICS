@@ -66,10 +66,31 @@ SELECTORS = {
     'send_image_button': ['[data-testid="image-send-button"]'],
     # 动作记录（Mock 页供断言用）
     'send_log': ['[data-testid="send-log"]'],
+    # 登录页二维码（v0.9；真实 DOM 待校准，失败时退化为整页截图）
+    'qr_image': ['img[src*="qr"]', 'img[alt*="二维码"]', 'canvas[class*="qr"]',
+                 '[class*="qrcode"] img', '[class*="qr-code"]'],
+    # 账号密码登录（v0.9；真实 DOM 未验证，候选为启发式，失败看诊断包校准）
+    'login_username': ['input[name="account"]', 'input[name="username"]',
+                       'input[name="mobile"]', 'input[placeholder*="账号"]',
+                       'input[placeholder*="手机"]'],
+    'login_password': ['input[type="password"]', 'input[name="password"]'],
+    'login_submit': ['button[type="submit"]', '[data-testid="login-submit"]',
+                     'button:has-text("登录")'],
 }
 
 QR_SCREENSHOT = 'qr.png'
 LOGIN_WAIT_SECONDS = 180
+
+
+def state_path_for_shop(shop_id) -> Path:
+    """每店独立的登录态文件；老版本全局文件作为兜底（仅当分店文件不存在时）。"""
+    base = Path(DEFAULT_STATE_PATH)
+    per_shop = base.parent / f'douyin_state_shop{shop_id}.json'
+    if per_shop.exists():
+        return per_shop
+    if base.exists():
+        return base
+    return per_shop
 
 
 class DouyinAdapter(BaseAdapter):
@@ -162,9 +183,10 @@ class DouyinAdapter(BaseAdapter):
             dbg.note(f'登录态检查：{"有效" if ok else "失效"}')
             return ok
 
-    def login(self) -> bool:
+    def login(self, on_qr=None) -> bool:
         """扫码登录：无登录态时截图二维码，用户手机扫码后保存登录态。
-        Mock 模式：点击「模拟扫码登录」按钮。"""
+        Mock 模式：点击「模拟扫码登录」按钮。
+        on_qr(path)：二维码截图保存后回调（v0.9 后台页面展示用）。"""
         if self.check_login():
             print('登录态有效，无需扫码', flush=True)
             return True
@@ -176,8 +198,10 @@ class DouyinAdapter(BaseAdapter):
                 page.wait_for_timeout(1000)
             else:
                 dbg.note('需要扫码登录，截取二维码…')
-                page.screenshot(path=QR_SCREENSHOT)
-                print(f'\n请用手机抖音/抖店 App 扫描二维码：{Path(QR_SCREENSHOT).resolve()}', flush=True)
+                qr_path = self._capture_qr(page, dbg)
+                print(f'\n请用手机抖音/抖店 App 扫描二维码：{qr_path}', flush=True)
+                if on_qr:
+                    on_qr(qr_path)
                 print(f'等待扫码（{LOGIN_WAIT_SECONDS} 秒超时）…', flush=True)
                 deadline = time.time() + LOGIN_WAIT_SECONDS
                 while time.time() < deadline:
@@ -189,6 +213,59 @@ class DouyinAdapter(BaseAdapter):
             self._page.context.storage_state(path=str(self.storage_state_path))
             dbg.note(f'登录成功，登录态已保存：{self.storage_state_path}')
             return True
+
+    def _capture_qr(self, page, dbg) -> str:
+        """截取登录二维码：优先截二维码元素，失败退化为整页截图。返回截图路径。"""
+        qr_path = str(Path(self.debug_dir) / f'qr-{time.strftime("%Y%m%d-%H%M%S")}.png')
+        Path(self.debug_dir).mkdir(parents=True, exist_ok=True)
+        for sel in SELECTORS['qr_image']:
+            try:
+                loc = page.locator(sel).first
+                if loc.count() and loc.is_visible():
+                    loc.screenshot(path=qr_path)
+                    dbg.note(f'二维码已截取（{sel}）')
+                    return qr_path
+            except Exception:
+                continue
+        page.screenshot(path=qr_path)
+        dbg.note('未定位到二维码元素，已截整页')
+        return qr_path
+
+    def login_with_password(self, username: str, password: str) -> bool:
+        """账号密码登录（v0.9）。真实登录页 DOM 未验证：选择器为启发式候选，
+        失败时诊断包（截图+DOM）会保存，可据此校准 SELECTORS。密码仅本次使用，不保存。"""
+        if self.check_login():
+            print('登录态有效，无需重复登录', flush=True)
+            return True
+        page = self._page
+        with DebugBundle(page, name='login_password', out_dir=self.debug_dir) as dbg:
+            dbg.note('尝试账号密码登录')
+            user_input = self._first_hit(page, SELECTORS['login_username'], '账号输入框')
+            pwd_input = self._first_hit(page, SELECTORS['login_password'], '密码输入框')
+            user_input.fill(username)
+            pwd_input.fill(password)
+            try:
+                btn = self._first_hit(page, SELECTORS['login_submit'], '登录按钮')
+                btn.click()
+            except Exception:
+                dbg.note('未找到登录按钮，改按回车提交')
+                pwd_input.press('Enter')
+            page.wait_for_timeout(3000)
+            if not self._is_logged_in(page):
+                raise RuntimeError(
+                    '账号密码登录未成功：可能选择器未命中真实登录页，'
+                    f'请查看诊断包 {dbg.bundle_dir or self.debug_dir} 校准 SELECTORS')
+            self._page.context.storage_state(path=str(self.storage_state_path))
+            dbg.note(f'账号登录成功，登录态已保存：{self.storage_state_path}')
+            return True
+
+    def logout(self) -> bool:
+        """退出登录：删除登录态文件。"""
+        p = Path(self.storage_state_path)
+        if p.exists():
+            p.unlink()
+            return True
+        return False
 
     def poll_new_messages(self) -> list:
         """轮询会话列表，返回新增的 [IncomingMessage]（内存 + DB 双重去重）。"""
