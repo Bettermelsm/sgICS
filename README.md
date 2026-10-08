@@ -105,10 +105,11 @@ python manage.py test
 
 ## 五、第二步：接真实抖店（v0.3 联调中）
 
-详见 `docs/DOUYIN.md` 联调手册。三条命令：
+详见 `docs/DOUYIN.md` 联调手册。登录推荐走后台页面（店铺账号 → 登录管理：扫码/账号密码/退出），
+命令行：
 
 ```bash
-docker compose exec web python manage.py login_douyin              # 扫码登录
+docker compose exec web python manage.py login_douyin --shop-id 2        # 扫码登录（按店）
 docker compose exec web python manage.py poll_douyin --shop-id 2 --once   # 单轮试跑
 docker compose exec web python manage.py poll_douyin --shop-id 2   # 持续轮询
 ```

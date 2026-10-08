@@ -22,7 +22,12 @@ def workbench_guide(request):
     kw_n = KeywordRule.objects.filter(is_active=True).count()
     tr_n = TransferRule.objects.filter(is_active=True).count()
     state_path = Path(os.environ.get('DOUYIN_STATE_PATH', 'douyin_state.json'))
-    state_ok = state_path.exists()
+    # v0.9：优先看各店登录标记；老版本全局文件兜底
+    state_ok = (ShopAccount.objects.filter(login_ok=True).exists()
+                or state_path.exists())
+    first_shop = ShopAccount.objects.order_by('id').first()
+    login_url = (reverse('admin:core_shopaccount_login', args=[first_shop.id])
+                 if first_shop else reverse('admin:core_shopaccount_changelist'))
     today_drafts = ReplyLog.objects.filter(
         created_at__date=timezone.localdate()).count()
     # v0.5：poller 心跳
@@ -51,9 +56,9 @@ def workbench_guide(request):
         },
         {
             'num': '03', 'title': '接客服', 'done': state_ok,
-            'desc': 'WSL 里跑 python manage.py login_douyin，手机扫码登录抖店客服工作台（飞鸽）（详见 docs/DOUYIN.md）。',
-            'status': '登录态已保存' if state_ok else '未登录，扫码后这里会变绿',
-            'url': None, 'action': '跑 login_douyin 命令',
+            'desc': '「店铺账号」→「登录管理」，扫码或账号密码登录抖店客服工作台。',
+            'status': '登录态已保存' if state_ok else '未登录，登录后这里会变绿',
+            'url': login_url, 'action': '去登录管理',
         },
         {
             'num': '04', 'title': '收草稿', 'done': today_drafts > 0,

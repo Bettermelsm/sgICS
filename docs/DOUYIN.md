@@ -34,15 +34,21 @@ docker compose exec web python manage.py demo_adapter --mock
 
 ## 1. 扫码登录
 
-```bash
-docker compose exec web python manage.py login_douyin
-```
+## 1. 登录（后台页面，推荐）
 
-- 容器里打开商家后台 → 点右上角「网页版飞鸽」，把二维码截成 `qr.png`
-- 终端会打印 qr.png 的路径；**用手机把图片传出来扫码**
-  （`docker compose cp web:/app/qr.png ./qr.png` 可把图拷到 WSL 里）
-- 扫码确认后自动保存登录态到 `douyin_state.json`，之后免扫码
-- 登录态过期（一般几周）时重跑一次本命令即可
+工作台 →「店铺账号」→ 选店 →「登录管理」，三种方式：
+
+- **扫码登录**：后台打开抖店登录页，二维码直接显示在页面上，手机抖音 App 扫码即可
+  （不用再从容器里拷 qr.png 图片出来）
+- **账号密码登录**：输入账号密码登录（仅本次使用，不保存）。
+  注意：真实登录页 DOM 尚未验证，若失败请把诊断包发回开发校准选择器
+- **检测登录状态**：轻量检查当前登录态是否有效
+- **退出登录**：删除该店登录态文件
+
+命令行也可用（按店）：`docker compose exec web python manage.py login_douyin --shop-id 1`
+
+- 登录态按店保存为 `douyin_state_shop<id>.json`（在 /data 卷，已 gitignore），之后免扫码
+- 登录态过期（一般几周）时重新登录一次即可
 
 ## 2. 轮询收消息（v0.5：常驻服务）
 

@@ -2,12 +2,13 @@
 import time
 
 from django.contrib import admin, messages
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import path
+from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
 
-from adapters.douyin import DouyinAdapter
+from adapters.douyin import DouyinAdapter, state_path_for_shop
 
 from .kb import guess_doc_type, ingest_doc
 from .models import (
@@ -16,6 +17,7 @@ from .models import (
     KeywordRule,
     KnowledgeChunk,
     KnowledgeDoc,
+    LoginJob,
     ReplyLog,
     ReplaceRule,
     ShopAccount,
@@ -39,11 +41,101 @@ class ChatMessageInline(admin.TabularInline):
     image_thumb.short_description = '图片'
 
 
+def _adapter_for(log):
+    """按草稿所属店铺构造适配器（每店独立登录态）。"""
+    return DouyinAdapter(
+        storage_state_path=state_path_for_shop(log.session.shop_id))
+
+
 @admin.register(ShopAccount)
 class ShopAccountAdmin(admin.ModelAdmin):
     list_display = ('name', 'platform', 'is_active', 'auto_reply',
-                    'manual_send_enabled', 'created_at')
+                    'manual_send_enabled', 'login_status', 'created_at')
     list_editable = ('is_active', 'auto_reply', 'manual_send_enabled')
+    readonly_fields = ('login_ok', 'login_checked_at')
+
+    def login_status(self, obj):
+        url = reverse('admin:core_shopaccount_login', args=[obj.pk])
+        if obj.login_ok:
+            return format_html('<span style="color:green">● 已登录</span> '
+                               '<a href="{}">登录管理</a>', url)
+        return format_html('<span style="color:#a00">○ 未登录</span> '
+                           '<a href="{}">登录管理</a>', url)
+    login_status.short_description = '登录态'
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path('<int:pk>/login/', self.admin_site.admin_view(self.login_manage_view),
+                 name='core_shopaccount_login'),
+            path('<int:pk>/login/job/<int:job_id>/',
+                 self.admin_site.admin_view(self.login_progress_view),
+                 name='core_shopaccount_login_progress'),
+            path('<int:pk>/login/job/<int:job_id>/status/',
+                 self.admin_site.admin_view(self.login_job_status_view),
+                 name='core_shopaccount_login_status'),
+        ]
+        return custom + urls
+
+    def login_manage_view(self, request, pk):
+        """登录管理页：状态 + 扫码登录 / 账号密码登录 / 检测状态 / 退出。"""
+        from core import login_service
+        shop = get_object_or_404(ShopAccount, pk=pk)
+        if request.method == 'POST':
+            action = request.POST.get('action')
+            try:
+                if action == 'start_qr':
+                    job = login_service.start_qr_login(shop)
+                    return redirect('admin:core_shopaccount_login_progress',
+                                    pk=pk, job_id=job.id)
+                elif action == 'start_password':
+                    job = login_service.start_password_login(
+                        shop, request.POST.get('username', '').strip(),
+                        request.POST.get('password', ''))
+                    return redirect('admin:core_shopaccount_login_progress',
+                                    pk=pk, job_id=job.id)
+                elif action == 'start_check':
+                    job = login_service.start_check_login(shop)
+                    return redirect('admin:core_shopaccount_login_progress',
+                                    pk=pk, job_id=job.id)
+                elif action == 'logout':
+                    login_service.logout_shop(shop)
+                    messages.success(request, f'{shop.name} 已退出登录')
+            except RuntimeError as e:
+                messages.error(request, str(e))
+            return redirect('admin:core_shopaccount_login', pk=pk)
+        context = {
+            **self.admin_site.each_context(request),
+            'title': f'登录管理 - {shop.name}',
+            'shop': shop,
+        }
+        return render(request, 'admin/core/shopaccount/login_manage.html', context)
+
+    def login_progress_view(self, request, pk, job_id):
+        """登录进度页：轮询任务状态，扫码模式展示二维码。"""
+        shop = get_object_or_404(ShopAccount, pk=pk)
+        job = get_object_or_404(LoginJob, pk=job_id, shop=shop)
+        context = {
+            **self.admin_site.each_context(request),
+            'title': f'{job.get_method_display()} - {shop.name}',
+            'shop': shop,
+            'job': job,
+            'status_url': reverse('admin:core_shopaccount_login_status',
+                                  args=[pk, job_id]),
+            'manage_url': reverse('admin:core_shopaccount_login', args=[pk]),
+        }
+        return render(request, 'admin/core/shopaccount/login_progress.html', context)
+
+    def login_job_status_view(self, request, pk, job_id):
+        """任务状态 JSON（前端轮询）。"""
+        job = get_object_or_404(LoginJob, pk=job_id, shop_id=pk)
+        return JsonResponse({
+            'status': job.status,
+            'status_display': job.get_status_display(),
+            'method': job.method,
+            'qr_url': job.qr_image.url if job.qr_image else '',
+            'error': job.error,
+        })
 
 
 @admin.register(ChatSession)
@@ -170,10 +262,10 @@ class ReplyLogAdmin(admin.ModelAdmin):
                     log.save(update_fields=['image'])
                     messages.success(request, '配图已上传')
                 elif action == 'send':
-                    send_draft(log, request.user, DouyinAdapter)
+                    send_draft(log, request.user, lambda: _adapter_for(log))
                     messages.success(request, f'草稿 #{log.id} 已发送')
                 elif action == 'transfer':
-                    transfer_draft(log, request.user, DouyinAdapter)
+                    transfer_draft(log, request.user, lambda: _adapter_for(log))
                     messages.success(request, f'草稿 #{log.id} 已转人工')
                 elif action == 'reject':
                     log.status = 'rejected'

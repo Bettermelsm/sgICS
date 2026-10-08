@@ -14,7 +14,7 @@ import traceback
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from adapters.douyin import DouyinAdapter
+from adapters.douyin import DouyinAdapter, state_path_for_shop
 from core.models import (
     ChatMessage, ChatSession, PollerHeartbeat, ReplyLog, ShopAccount,
 )
@@ -49,7 +49,8 @@ class Command(BaseCommand):
         signal.signal(signal.SIGTERM, self._on_signal)
         signal.signal(signal.SIGINT, self._on_signal)
 
-        adapters = {s.id: DouyinAdapter() for s in shops}
+        adapters = {s.id: DouyinAdapter(
+            storage_state_path=state_path_for_shop(s.id)) for s in shops}
         backoff = {s.id: 0 for s in shops}
         self.stdout.write(
             f'消息泵启动：{[s.name for s in shops]}，间隔={opts["interval"]}s，草稿模式')
