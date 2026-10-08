@@ -18,6 +18,10 @@ class ShopAccount(models.Model):
     manual_send_enabled = models.BooleanField(
         '允许人工审核发送', default=False,
         help_text='开启后，管理员可在"回复日志"中人工批准发送草稿。默认关闭。')
+    # v0.9：登录管理。密码永不入库，登录时一次性使用。
+    douyin_username = models.CharField('抖店登录账号（备注）', max_length=100, blank=True, default='')
+    login_ok = models.BooleanField('登录态有效', default=False)
+    login_checked_at = models.DateTimeField('上次检测登录', null=True, blank=True)
     created_at = models.DateTimeField('创建时间', auto_now_add=True)
 
     class Meta:
@@ -164,6 +168,38 @@ class PollerHeartbeat(models.Model):
 
     def __str__(self):
         return f'{self.shop.name} 心跳'
+
+
+class LoginJob(models.Model):
+    """后台登录任务：扫码/账号/状态检测，后台线程执行，前端轮询进度。"""
+
+    METHOD_CHOICES = [
+        ('qr', '扫码登录'),
+        ('password', '账号密码登录'),
+        ('check', '检测登录状态'),
+    ]
+    STATUS_CHOICES = [
+        ('running', '进行中'),
+        ('waiting_qr', '等待扫码'),
+        ('success', '成功'),
+        ('failed', '失败'),
+    ]
+
+    shop = models.ForeignKey(ShopAccount, verbose_name='店铺', on_delete=models.CASCADE)
+    method = models.CharField('方式', max_length=20, choices=METHOD_CHOICES)
+    status = models.CharField('状态', max_length=20, choices=STATUS_CHOICES, default='running')
+    qr_image = models.ImageField('二维码', upload_to='login_qr/', null=True, blank=True)
+    error = models.TextField('错误信息', blank=True, default='')
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+    updated_at = models.DateTimeField('更新时间', auto_now=True)
+
+    class Meta:
+        verbose_name = '登录任务'
+        verbose_name_plural = '登录任务'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.shop.name} {self.get_method_display()}（{self.get_status_display()}）'
 
 
 class KnowledgeDoc(models.Model):

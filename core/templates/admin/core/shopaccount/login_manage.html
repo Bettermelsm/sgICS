@@ -1,0 +1,58 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>登录管理 - {{ shop.name }}</h1>
+
+<p>
+  当前状态：
+  {% if shop.login_ok %}
+    <strong style="color:green">● 登录态有效</strong>
+  {% else %}
+    <strong style="color:#a00">○ 未登录 / 登录态失效</strong>
+  {% endif %}
+  {% if shop.login_checked_at %}<span style="color:#888">（上次检测：{{ shop.login_checked_at|date:"m-d H:i" }}）</span>{% endif %}
+</p>
+{% if shop.douyin_username %}
+<p style="color:#888">上次登录账号：{{ shop.douyin_username }}（仅备注，密码不保存）</p>
+{% endif %}
+
+<hr>
+<h2>扫码登录</h2>
+<p style="color:#666">后台打开抖店登录页，截取二维码显示在这里，手机抖音 App 扫码即可。</p>
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="start_qr">
+  <button type="submit" class="button">开始扫码登录</button>
+</form>
+
+<hr>
+<h2>账号密码登录</h2>
+<p style="color:#666">输入店铺的抖店账号密码（<strong>仅本次登录使用，不保存</strong>）。
+真实登录页结构待校准：若失败，诊断包会保留，可发回开发校准。</p>
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="start_password">
+  <p><label>账号：<input type="text" name="username" value="{{ shop.douyin_username }}" autocomplete="username"></label></p>
+  <p><label>密码：<input type="password" name="password" autocomplete="current-password"></label></p>
+  <button type="submit" class="button">账号密码登录</button>
+</form>
+
+<hr>
+<h2>检测登录状态</h2>
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="start_check">
+  <button type="submit" class="button">检测当前登录态</button>
+</form>
+
+<hr>
+<h2>退出登录</h2>
+<p style="color:#666">删除该店保存的登录态文件，之后需重新登录。</p>
+<form method="post" onsubmit="return confirm('确定退出该店的抖店登录吗？')">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="logout">
+  <button type="submit" class="button" style="background:#a00;color:#fff">退出登录</button>
+</form>
+
+<p style="margin-top:16px"><a href="../">← 返回店铺账号</a></p>
+{% endblock %}

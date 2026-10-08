@@ -1,4 +1,5 @@
 """config URL Configuration."""
+from django.conf import settings
 from django.contrib import admin
 from django.urls import path
 
@@ -15,3 +16,8 @@ urlpatterns = [
     # 演示占位页：未开放功能统一跳转到这里
     path('coming-soon/', core_views.coming_soon, name='coming_soon'),
 ]
+
+# v0.9：开发/演示环境由 Django 直接提供上传文件访问（二维码、配图等）
+if settings.DEBUG:
+    from django.conf.urls.static import static
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
